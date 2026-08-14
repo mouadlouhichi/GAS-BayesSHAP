@@ -1,0 +1,6 @@
+# Domain game bounds and deterministic semantics
+membership: {bounds: [0.0, 1.0]}
+contrastive: {bounds: [-1.0, 1.0]}
+global_archetype: {bounds: [0.0, 1.0]}
+silhouette: {bounds: [-1.0, 1.0]}
+group_lag: {groups: 11}

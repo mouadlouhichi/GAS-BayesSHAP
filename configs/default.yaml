@@ -1,0 +1,19 @@
+run_id: null
+seed: 20260814
+game: membership
+M: 4
+sigma0: 1.0
+lengthscale: 1.5
+eta: 0.0001
+epsilon: 0.2
+delta: 0.05
+max_budget: 200
+max_rounds: 100
+n_pilot: 3
+n_active_steps: 8
+pool_size: null
+neyman_refresh_frequency: 10
+certification_mode: STRICT
+output_bounds: [0.0, 1.0]
+checkpoint_root: checkpoints
+results_root: results/runs
