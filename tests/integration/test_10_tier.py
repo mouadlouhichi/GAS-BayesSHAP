@@ -124,12 +124,29 @@ def test_tier7_surrogate_global_boundedness():
 
 
 def test_tier8_zero_extreme_stratum_allocation():
+    """The coupled Neyman allocator optimizes over draw sizes q=1..M-1:
+    draw size q=0 (the empty coalition) is never drawn (probs[0] == 0), while
+    q=M-1 is a legitimate draw size because it supplies remove-one samples to
+    the final interior stratum s=M-2 (Theorem A / spec section 2.6)."""
     from gas_bayesshap.residual.neyman import solve_coupled_neyman_allocation
     M = 4
     sol = solve_coupled_neyman_allocation(np.ones((M, M)), M, K_cert=100)
-    assert sol.probabilities[0] == 0.0
-    assert sol.probabilities[M - 1] == 0.0 or M <= 2
+    assert sol.probabilities[0] == 0.0            # q=0 never drawn
+    assert np.all(sol.probabilities[1:] >= 0.0)   # all draw sizes admissible
     assert abs(sol.probabilities.sum() - 1.0) < 1e-9
+
+
+def test_tier8_q_equals_M_minus_1_feeds_last_interior_stratum():
+    """When variance concentrates on the final interior stratum s=M-2, the
+    solver must allocate mass to draw size q=M-1 (its remove-one samples land
+    in stratum M-2)."""
+    from gas_bayesshap.residual.neyman import solve_coupled_neyman_allocation
+    M = 5
+    sigma = np.ones((M, M))
+    sigma[M - 2, :] = 10.0  # stratum s = M-2 dominant
+    sol = solve_coupled_neyman_allocation(sigma, M, K_cert=100)
+    assert sol.probabilities[0] == 0.0
+    assert sol.probabilities[M - 1] > 0.0  # q=M-1 draws are used
 
 
 def test_tier9_m2_exact_certification():

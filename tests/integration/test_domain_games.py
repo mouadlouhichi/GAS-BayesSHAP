@@ -75,6 +75,36 @@ def test_archetype_game():
     assert oracle.total_model_evals - n0 == 2 * 4
 
 
+def test_archetype_game_empty_and_full_semantics():
+    """Spec section 3.3: v(S) = 1/(|I_tilde| B) sum_x sum_b g_c(x_S, z^b_{bar S}).
+
+    * S = empty  -> background-only average (equals E_base), 0 model passes;
+    * S = full   -> mean of g_c over the archetypes, |I_tilde| model passes.
+    """
+    rng = np.random.RandomState(3)
+    w = rng.randn(4)
+
+    def g_c(x):
+        return 1.0 / (1.0 + np.exp(-np.dot(x, w)))
+
+    archetypes = rng.randn(3, 4)
+    background = rng.randn(5, 4)
+    oracle, _ = archetype_game(g_c, archetypes, background)
+
+    # empty coalition: v(empty) = (1/B) sum_b g_c(z^{(b)}) = E_base
+    n0_model = oracle.total_model_evals
+    v_empty = oracle.evaluate(np.ones(4), np.zeros(4, dtype=bool))
+    assert abs(v_empty - oracle.E_base) < 1e-12
+    assert abs(v_empty - np.mean([g_c(b) for b in background])) < 1e-12
+    assert oracle.total_model_evals == n0_model  # baseline shortcut, 0 passes
+
+    # full coalition: v(full) = (1/|I_tilde|) sum_x g_c(x)
+    n0_model = oracle.total_model_evals
+    v_full = oracle.evaluate(np.ones(4), np.ones(4, dtype=bool))
+    assert abs(v_full - np.mean([g_c(a) for a in archetypes])) < 1e-12
+    assert oracle.total_model_evals - n0_model == len(archetypes)
+
+
 def test_silhouette_game():
     rng = np.random.RandomState(0)
     X = np.vstack([

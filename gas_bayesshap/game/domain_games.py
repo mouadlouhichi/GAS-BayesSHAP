@@ -141,16 +141,28 @@ class ArchetypeOracle(CoalitionOracle):
         )
 
     def _evaluate_uncached(self, x: np.ndarray, S_mask: np.ndarray) -> float:
+        """Evaluates the archetype game.
+
+        .. math::
+
+            v(S) = \\frac{1}{|\\tilde{\\mathcal{I}}_c| \\cdot B}
+                \\sum_{x \\in \\tilde{\\mathcal{I}}_c} \\sum_{b=1}^B
+                g_c(x_S, z^{(b)}_{\\bar S})
+
+        For ``S = ∅`` no features come from the archetypes, so every
+        (archetype, background) pair evaluates ``g_c(z^{(b)})`` and
+        :math:`v(\\emptyset) = \\frac{1}{B}\\sum_b g_c(z^{(b)}) = E_{\\text{base}}`
+        (baseline shortcut, 0 model passes — consistent with the standard
+        oracle's empty-coalition semantics).
+        """
         if np.all(S_mask):
             vals = [self.model_fn(a) for a in self.archetypes]
             self.total_model_evals += self.n_archetypes
             self._last_model_evals = self.n_archetypes
             return float(np.mean(vals))
         if not np.any(S_mask):
-            vals = [self.model_fn(a) for a in self.archetypes]
-            self.total_model_evals += self.n_archetypes
-            self._last_model_evals = self.n_archetypes
-            return float(np.mean(vals))
+            self._last_model_evals = 0
+            return float(self.E_base)
         total = 0.0
         for a in self.archetypes:
             X_hybrid = np.tile(a, (self.B, 1))

@@ -88,6 +88,7 @@ class CoalitionOracle:
         self.total_model_evals = 0
         self.cache_hits = 0
         self.cache_misses = 0
+        self._last_model_evals = 0  # model passes of the most recent evaluation
 
         # Precompute baseline expectation E[f(X)] over the background
         bg_preds = [self.model_fn(self.background[b]) for b in range(self.B)]

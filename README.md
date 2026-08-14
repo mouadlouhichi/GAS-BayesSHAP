@@ -136,6 +136,19 @@ numerics, certification and engineering requirements of the specification
 (spec section 53).  The verification tests cover the complete 10-tier suite
 (spec section 6) plus the additional required tests (spec section 44).
 
+## Domain-model pipeline status
+
+The repository implements the **complete algorithm engine** (bounded-linear
+control variate, Lemmas D–G, Theorems A–C, Corollary C.1, certification,
+checkpointing, logging, caching) plus the **domain-game wrappers**
+(membership, contrastive, archetype, silhouette, group-lag).  However, the
+**CLI scripts currently run synthetic stand-in models** (logistic/linear toy
+games) — the real Wine-quality / Beijing air-quality clustering pipelines
+(PCA → K-Means → LightGBM surrogate, DEC + temporal transformer) and their
+data loaders are **not bundled**.  The CLI prints a notice whenever
+`--dataset wine|beijing_*` is used; script results are for engine validation,
+not for the paper's experimental claims.
+
 ## Caveats / engineering decisions (documented)
 
 - **Cache semantics**: coalition-cache hits return stored values with `+0`

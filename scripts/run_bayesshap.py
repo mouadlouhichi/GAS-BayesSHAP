@@ -90,7 +90,15 @@ def build_oracle_and_engine(cfg, run_id):
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="GAS-BayesSHAP runner (v11.0)")
+    p = argparse.ArgumentParser(
+        description=(
+            "GAS-BayesSHAP runner (v11.0).  NOTE: the CLI currently builds "
+            "SYNTHETIC stand-in models (logistic/linear toy games) — the real "
+            "wine / Beijing air-quality clustering pipelines are not bundled. "
+            "The engine, games and certification are production-grade; the "
+            "domain models for the paper experiments are not."
+        )
+    )
     p.add_argument("--config", default="configs/default.yaml")
     p.add_argument("--dataset", default=None)
     p.add_argument("--game", default=None)
@@ -174,6 +182,10 @@ def main() -> int:
     x = np.ones(engine.M)
     print(f"run_id={run_id}  M={engine.M}  game={cfg['domain_game']}  "
           f"resume={args.resume or args.from_stage is not None}")
+    if cfg.get("dataset"):
+        print(f"[note] dataset '{cfg['dataset']}' is served by a SYNTHETIC "
+              "stand-in model (no real data pipeline is bundled); results are "
+              "for engine validation, not paper experiments.")
     res = engine.explain(
         x,
         epsilon=cfg["epsilon"],
