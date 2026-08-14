@@ -1,6 +1,6 @@
 {
-  "commit": "92b6fb97c6adbbf089ce38aa7c62af3fd0d540b7",
-  "dirty": true,
+  "commit": "25a784fd3447b8c4ca594e94d1eb2a5451c278d3",
+  "dirty": false,
   "math_validation": {
     "note": "scripts/validate_math.py exit 0",
     "passed": true
@@ -13,10 +13,10 @@
     "scipy": "1.17.1"
   },
   "pytest": {
-    "duration_s": 54.65,
+    "duration_s": 55.72,
     "failed": 0,
     "passed": 185
   },
   "python": "3.11.2",
-  "timestamp": "2026-08-14T13:49:51.853712+00:00"
+  "timestamp": "2026-08-14T13:52:06.994622+00:00"
 }

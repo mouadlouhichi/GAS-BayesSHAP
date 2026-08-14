@@ -22,3 +22,7 @@ checkpoints/
 .DS_Store
 .idea/
 .vscode/
+
+# CI workflow prepared but unpushable (GitHub App lacks `workflows` permission);
+# keep it out of the tree until permissions allow, then `git add -f`.
+.github/
