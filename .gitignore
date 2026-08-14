@@ -31,3 +31,5 @@ checkpoints/
 results/wine_tierA/
 results/air_quality_tierA/
 results/air_quality_tierB/
+
+*.zip
