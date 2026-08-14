@@ -320,7 +320,10 @@ A(md("## 10. Exact Shapley enumeration for M=11 (2^11 = 2048 coalitions)"))
 A(cell("""def make_proba_model(cluster_id):
     def model_fn(x):
         x = np.asarray(x, dtype=float).reshape(1, -1)
-        return float(lgb_model.predict_proba(x)[0, cluster_id])
+        # pass a DataFrame with the training feature names so LightGBM does not
+        # emit "X does not have valid feature names" on every call
+        x_df = pd.DataFrame(x, columns=FEATURES)
+        return float(lgb_model.predict_proba(x_df)[0, cluster_id])
     return model_fn
 
 B = 64
@@ -375,7 +378,8 @@ tree_phi = sv_tree[0]   # first test instance (class extractor applied above)
 
 # --- KernelSHAP (probability game, non-certified baseline) ---
 def proba_matrix(Xmat):
-    return lgb_model.predict_proba(np.asarray(Xmat))[:, cluster_id]
+    Xdf = pd.DataFrame(np.asarray(Xmat), columns=FEATURES)
+    return lgb_model.predict_proba(Xdf)[:, cluster_id]
 
 kexplainer = shap.KernelExplainer(proba_matrix, background)
   # matched background
@@ -492,7 +496,8 @@ A(md("## 16. Exact group Shapley (2^11 = 2048 group coalitions)"))
 A(cell("""def make_lag_proba_model(cluster_id):
     def model_fn(x):
         x = np.asarray(x, dtype=float).reshape(1, -1)
-        return float(lgb_lag.predict_proba(x)[0, cluster_id])
+        x_df = pd.DataFrame(x, columns=list(X_lag.columns))
+        return float(lgb_lag.predict_proba(x_df)[0, cluster_id])
     return model_fn
 
 B_lag = 32
