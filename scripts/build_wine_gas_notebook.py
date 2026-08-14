@@ -112,10 +112,23 @@ def _synthetic_wine(n=1500, seed=1301):
 def load_wine():
     global DATA_SOURCE
     cached = os.path.join(DATA_DIR, "winequality-white.csv")
-    # 1) cached local copy (previous download or user-provided)
+    # 1) cached local copy (previous download or user-provided) -- VALIDATED:
+    #    a stale/wrong file is quarantined and re-downloaded instead of crashing
     if os.path.exists(cached):
-        DATA_SOURCE = f"cache:{cached}"
-        return pd.read_csv(cached, sep=";")
+        try:
+            cand = pd.read_csv(cached, sep=";")
+            if set(WINE_FEATURES).issubset(cand.columns) and "quality" in cand.columns:
+                DATA_SOURCE = f"cache:{cached}"
+                return cand
+            print(f"WARNING: cached {os.path.basename(cached)} is NOT the wine dataset "
+                  f"(cols={list(cand.columns)[:6]}...) -> quarantining")
+        except Exception as exc:
+            print("cached wine CSV unreadable:", type(exc).__name__, "- quarantining")
+        try:
+            os.replace(cached, cached + ".bad")
+        except OSError:
+            try: os.remove(cached)
+            except OSError: pass
     # 2) download from mirrors into data/ (cached for later runs)
     print("Downloading wine dataset ...")
     mirrors = [

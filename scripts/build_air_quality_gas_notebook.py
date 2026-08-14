@@ -147,34 +147,91 @@ def _synthetic_air(n=3000, seed=1301):
 def load_air():
     global DATA_SOURCE
     combined = os.path.join(DATA_DIR, "Beijing_MultiSite_AirQuality.csv")
-    # 1) cached combined CSV (previous download or user-provided)
-    if os.path.exists(combined):
-        DATA_SOURCE = f"cache:{combined}"
-        return pd.read_csv(combined)
-
     zip_path = os.path.join(DATA_DIR, "Beijing_MultiSite_AirQuality.zip")
-    # 2) download the UCI multi-site ZIP into data/ (cached for later runs).
-    #    The official UCI static URL can redirect to a WRONG archive (e.g. a
-    #    stock-market CSV), so every downloaded ZIP is validated: it must
-    #    contain the 11 expected air-quality features after concatenation.
+
+    def _valid(df):
+        return set(FEATURES).issubset(df.columns)
+
+    def _quarantine(path):
+        bad = path + ".bad"
+        try:
+            os.replace(path, bad)
+            print(f"  quarantined invalid file -> {os.path.basename(bad)}")
+        except OSError:
+            try: os.remove(path)
+            except OSError: pass
+
+    # 1) cached combined CSV (previous download or user-provided) -- VALIDATED;
+    #    a stale wrong file (e.g. a stock CSV cached by an older loader) is
+    #    quarantined and ignored instead of crashing.
+    if os.path.exists(combined):
+        try:
+            cand = pd.read_csv(combined)
+            if _valid(cand):
+                DATA_SOURCE = f"cache:{combined}"
+                return cand
+            print(f"WARNING: cached {os.path.basename(combined)} is NOT the air-quality "
+                  f"dataset (cols={list(cand.columns)[:6]}...) -> quarantining")
+            _quarantine(combined)
+        except Exception as exc:
+            print("cached combined CSV unreadable:", type(exc).__name__, "- quarantining")
+            _quarantine(combined)
+
+    # 1b) directory of per-station CSVs (e.g. PRSA_Data_*.csv extracted from the
+    #     Kaggle/UCI archive into data/beijing/).  Merged like the standard
+    #     multi-file recipe, with a station column and air-quality validation.
+    for sub in ("beijing", "PRSA_Data_20130301-20170228"):
+        subdir = os.path.join(DATA_DIR, sub)
+        if os.path.isdir(subdir):
+            frames = []
+            for fn in sorted(os.listdir(subdir)):
+                if fn.lower().endswith(".csv"):
+                    tmp = pd.read_csv(os.path.join(subdir, fn))
+                    if not set(FEATURES).intersection(tmp.columns):
+                        print(f"  skipping {fn} (not an air-quality file)")
+                        continue
+                    if "station" not in tmp.columns:
+                        tmp["station"] = os.path.splitext(fn)[0]
+                    frames.append(tmp)
+            if frames:
+                df = pd.concat(frames, ignore_index=True)
+                if _valid(df):
+                    df.to_csv(combined, index=False)
+                    DATA_SOURCE = f"dir-merge:{subdir} (cached to {combined})"
+                    return df
+                print(f"WARNING: merged CSVs in {subdir} lack the air-quality features "
+                      f"({list(df.columns)[:6]}...) -> quarantining combined")
+
+    # 2) cached ZIP -- validated; a wrong archive is quarantined and re-downloaded
     def _zip_is_valid(zpath):
         try:
             with zipfile.ZipFile(zpath) as z:
                 names = [n for n in z.namelist() if n.endswith(".csv")]
                 if not names:
                     return False
-                probe = pd.concat(
-                    [pd.read_csv(z.open(n)).assign(station=os.path.splitext(os.path.basename(n))[0])
-                     for n in names], ignore_index=True)
+                frames = []
+                for nm in names:
+                    tmp = pd.read_csv(z.open(nm))
+                    if set(FEATURES).intersection(tmp.columns):
+                        if "station" not in tmp.columns:
+                            tmp["station"] = os.path.splitext(os.path.basename(nm))[0]
+                        frames.append(tmp)
+                if not frames:
+                    return False
+                probe = pd.concat(frames, ignore_index=True)
                 return set(FEATURES).issubset(probe.columns)
         except Exception:
             return False
 
+    if os.path.exists(zip_path) and not _zip_is_valid(zip_path):
+        print(f"WARNING: cached {os.path.basename(zip_path)} is an INVALID archive -> quarantining")
+        _quarantine(zip_path)
+
     if not os.path.exists(zip_path):
         print("Downloading Beijing multi-site air-quality dataset ...")
-        # CSV mirrors (single combined table) are tried first; ZIP mirrors
-        # (per-station archives) are extracted and combined.  Each is validated
-        # to contain the 11 air-quality features before being accepted.
+        # CSV mirrors (single combined table) tried first; ZIP mirrors (per-station
+        # archives) extracted and combined.  Each is validated to contain the 11
+        # air-quality features before being accepted.
         csv_mirrors = [
             # 1) stable GitHub mirror of the UCI dataset (combined data.csv)
             "https://raw.githubusercontent.com/Afkerian/Beijing-Multi-Site-Air-Quality-Data-Data-Set/main/data/beijing%2Bmulti%2Bsite%2Bair%2Bquality%2Bdata/data.csv",
@@ -200,8 +257,8 @@ def load_air():
             if _download(u, tmp):
                 try:
                     probe = pd.read_csv(tmp)
-                    if set(FEATURES).issubset(probe.columns):
-                        os.replace(tmp, combined)  # cache the combined CSV
+                    if _valid(probe):
+                        os.replace(tmp, combined)
                         ok = True
                         break
                 except Exception:
@@ -236,13 +293,16 @@ def load_air():
         frames = []
         for nm in csv_names:
             tmp = pd.read_csv(z.open(nm))
+            if not set(FEATURES).intersection(tmp.columns):
+                print(f"  skipping {nm} (not an air-quality file)")
+                continue
             if "station" not in tmp.columns:
                 tmp["station"] = os.path.splitext(os.path.basename(nm))[0]
             frames.append(tmp)
         df = pd.concat(frames, ignore_index=True)
 
     # validate the combined table once more before proceeding
-    if not set(FEATURES).issubset(df.columns):
+    if not _valid(df):
         print("combined download does NOT contain the 11 air-quality features:",
               list(df.columns)[:12])
         print("-> using SYNTHETIC regime-structured fallback.")
