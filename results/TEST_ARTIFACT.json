@@ -1,0 +1,22 @@
+{
+  "commit": "92b6fb97c6adbbf089ce38aa7c62af3fd0d540b7",
+  "dirty": true,
+  "math_validation": {
+    "note": "scripts/validate_math.py exit 0",
+    "passed": true
+  },
+  "packages": {
+    "PyYAML": "6.0.3",
+    "numpy": "2.4.6",
+    "pytest": "9.1.1",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.17.1"
+  },
+  "pytest": {
+    "duration_s": 54.65,
+    "failed": 0,
+    "passed": 185
+  },
+  "python": "3.11.2",
+  "timestamp": "2026-08-14T13:49:51.853712+00:00"
+}

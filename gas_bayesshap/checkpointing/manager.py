@@ -151,10 +151,22 @@ class CheckpointManager:
             match the manifest record.
         """
         json_path = self.directory / f"{name}.json"
-        npz_name = load_json(json_path).get("_npz")
+        try:
+            json_meta = load_json(json_path)
+        except Exception as exc:
+            # malformed JSON must surface as an integrity failure so
+            # load_latest() can fall back to the previous valid checkpoint
+            raise CheckpointIntegrityError(
+                f"checkpoint {name!r}: unreadable/corrupt JSON ({type(exc).__name__})"
+            ) from exc
+        npz_name = json_meta.get("_npz")
         if npz_name is None:
             raise FileNotFoundError(f"checkpoint {name} missing npz reference")
         npz_path = self.directory / npz_name
+        if not npz_path.exists():
+            raise CheckpointIntegrityError(
+                f"checkpoint {name!r}: NPZ file missing ({npz_path.name})"
+            )
 
         # 1. file-level integrity (checksums recorded at save time)
         record = self.manifest.integrity_record(name)

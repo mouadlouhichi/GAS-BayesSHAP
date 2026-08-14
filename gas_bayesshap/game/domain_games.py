@@ -313,13 +313,29 @@ def build_group_lags(n_vars: int, lags: Tuple[int, ...]) -> List[Tuple[int, ...]
     """Return macro-player feature groups ``[(var, lag), ...]``.
 
     Example: ``n_vars=11, lags=(0,1,3,6,12,24)`` -> 11 groups x 6 lags = 66 features.
+
+    Validation: ``n_vars >= 1``, non-empty strictly-increasing positive lags,
+    and the resulting groups are disjoint (macro-players must partition the
+    feature set for the cooperative game to be well defined).
     """
+    if not isinstance(n_vars, int) or n_vars < 1:
+        raise ValueError(f"n_vars must be a positive integer, got {n_vars!r}")
+    if not isinstance(lags, (tuple, list)) or len(lags) == 0:
+        raise ValueError("lags must be a non-empty sequence")
+    lags = tuple(int(l) for l in lags)
+    if any(l < 0 for l in lags):
+        raise ValueError(f"lags must be non-negative, got {lags}")
+    if len(set(lags)) != len(lags):
+        raise ValueError(f"lags must be distinct, got {lags}")
+
     groups: List[Tuple[int, ...]] = []
+    seen: set = set()
     for var in range(n_vars):
-        members = []
-        for lag in lags:
-            members.append(var * len(lags) + lags.index(lag))
-        groups.append(tuple(sorted(members)))
+        members = tuple(var * len(lags) + li for li in range(len(lags)))
+        if any(m in seen for m in members):
+            raise ValueError(f"overlapping group members for var {var}")
+        seen.update(members)
+        groups.append(members)
     return groups
 
 

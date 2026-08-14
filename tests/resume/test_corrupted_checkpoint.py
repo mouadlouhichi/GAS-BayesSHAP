@@ -6,7 +6,10 @@ import numpy as np
 import pytest
 
 from gas_bayesshap import GASBayesSHAP
-from gas_bayesshap.checkpointing.compatibility import CheckpointCompatibilityError
+from gas_bayesshap.checkpointing.compatibility import (
+    CheckpointCompatibilityError,
+    CheckpointIntegrityError,
+)
 from gas_bayesshap.checkpointing.manager import CheckpointManager
 
 RESULTS_DIR = "results/tests-corrupt"
@@ -15,7 +18,8 @@ CKPT_DIR = "checkpoints/tests-corrupt"
 
 def test_partially_written_checkpoint_never_valid(tmp_path):
     """A checkpoint whose file exists but is not referenced by the manifest is
-    not loaded; a missing referenced file raises FileNotFoundError."""
+    not loaded; a missing referenced file surfaces as an integrity error (so
+    the fallback logic can engage)."""
     mgr = CheckpointManager("r1", tmp_path / "ck", config_hash="c", oracle_hash="o",
                             background_hash="b", M=3, engine_version="11.0.0")
     mgr.save("gp_stage", 0, {"D_coalitions": np.eye(3, dtype=bool)})
@@ -25,7 +29,7 @@ def test_partially_written_checkpoint_never_valid(tmp_path):
     import os
     for npz in glob.glob(str(tmp_path / "ck" / "r1" / "*.npz")):
         os.remove(npz)
-    with pytest.raises(OSError):
+    with pytest.raises(CheckpointIntegrityError):
         mgr.load_latest()
 
 
