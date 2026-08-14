@@ -1,0 +1,38 @@
+# Certification-focused configuration: tighter epsilon, more budget,
+# strict mode, and full engineering safeguards.
+
+sigma0: 1.0
+lengthscale: 1.5
+eta: 1.0e-4
+
+epsilon: 0.02
+delta: 0.05
+max_budget: 3000
+max_rounds: null
+n_pilot: 5
+n_active_steps: 30
+pool_size: null
+neyman_refresh_interval: null
+certification_mode: STRICT
+
+domain_game: membership
+dataset: null
+M: null
+output_bounds: null
+
+seed: 42
+checkpoint_enabled: true
+checkpoint_every: 1
+cache_enabled: true
+persist_cache: true
+log_level: INFO
+results_dir: results/runs
+checkpoints_dir: checkpoints
+n_trials: 30
+numerical_tol: 1.0e-10
+finite_check: true
+
+oracle_validation: true
+mathematical_validation: true
+validate_boundedness: true
+boundedness_sweep_max_M: 12

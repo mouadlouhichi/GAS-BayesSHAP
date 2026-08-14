@@ -1,0 +1,21 @@
+# Domain-game presets (spec section 3).  Each preset overrides the base keys.
+
+membership:
+  domain_game: membership
+  output_bounds: [0.0, 1.0]      # v(S) in [0,1] -> R_delta_res = 4
+
+contrastive:
+  domain_game: contrastive
+  output_bounds: [-1.0, 1.0]     # v(S) in [-1,1] -> R_delta_res = 8
+
+archetype:
+  domain_game: archetype
+  output_bounds: [0.0, 1.0]      # v(S) in [0,1] -> R_delta_res = 4
+
+silhouette:
+  domain_game: silhouette
+  output_bounds: [-1.0, 1.0]     # v(S) in [-1,1] -> R_delta_res = 8
+
+group_lag:
+  domain_game: group_lag
+  output_bounds: null            # depends on the lag model; supply [L, U] for rigor

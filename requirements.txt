@@ -1,0 +1,15 @@
+# Core runtime dependencies
+numpy>=1.23
+scipy>=1.9
+pyyaml>=6.0
+
+# Domain games (silhouette / clustering backends) - optional but recommended
+scikit-learn>=1.1
+
+# Notebook execution (notebooks/run_all.ipynb)
+nbformat>=5.5
+nbclient>=0.8
+ipykernel>=6.20
+
+# Testing
+pytest>=7.0

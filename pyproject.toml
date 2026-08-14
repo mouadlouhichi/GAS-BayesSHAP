@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gas-bayesshap"
+version = "11.0.0"
+description = "Gaussian-Adaptive Stratified Bayesian Shapley Estimation: bounded-linear Bayesian control variates + Neyman-stratified anytime empirical-Bernstein certification (spec v11.0)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Mouad Louhichi" }]
+keywords = [
+    "shapley", "explainable-ai", "bayesian-quadrature",
+    "active-learning", "confidence-sequences", "certification",
+]
+dependencies = [
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+games = ["scikit-learn>=1.1"]        # silhouette game, clustering backends
+notebook = ["nbformat>=5.5", "nbclient>=0.8", "ipykernel>=6.20"]
+dev = [
+    "pytest>=7.0",
+    "scikit-learn>=1.1",
+    "nbformat>=5.5",
+    "nbclient>=0.8",
+    "ipykernel>=6.20",
+]
+
+[tool.setuptools.packages.find]
+include = ["gas_bayesshap*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

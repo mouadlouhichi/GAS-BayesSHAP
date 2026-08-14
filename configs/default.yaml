@@ -1,0 +1,44 @@
+# GAS-BayesSHAP default run configuration (v11.0)
+# Every engine setting is configurable here; nothing is hard-coded.
+
+# --- kernel / surrogate -------------------------------------------------
+sigma0: 1.0
+lengthscale: 1.5
+eta: 1.0e-4
+
+# --- certification --------------------------------------------------------
+epsilon: 0.05            # target max certified width (anytime stopping threshold)
+delta: 0.05              # anytime coverage error probability
+max_budget: 1500         # max individual coalition evaluations in Stage-2 adaptive loop
+max_rounds: null         # optional cap on Stage-2 sampling iterations (null = unlimited)
+n_pilot: 3               # pilot draws per interior stratum
+n_active_steps: 25       # active GP acquisition steps
+pool_size: null          # null -> max(32, 2*M)
+neyman_refresh_interval: null   # null -> 5*M evaluations
+certification_mode: STRICT      # STRICT | PERMISSIVE
+
+# --- domain / data ---------------------------------------------------------
+domain_game: membership  # membership | contrastive | archetype | silhouette | group_lag
+dataset: null
+M: null                  # optional override (group-lag games)
+output_bounds: null      # [L, U] for rigorous certification, or null (heuristic, flagged)
+
+# --- engineering ------------------------------------------------------------
+seed: 42
+checkpoint_enabled: true
+checkpoint_every: 1
+cache_enabled: true
+gp_prediction_cache: false
+persist_cache: true
+log_level: INFO
+results_dir: results/runs
+checkpoints_dir: checkpoints
+n_trials: 30             # coverage-validation trials
+numerical_tol: 1.0e-10
+finite_check: true
+
+# --- validation hooks ---------------------------------------------------------
+oracle_validation: false
+mathematical_validation: false
+validate_boundedness: false
+boundedness_sweep_max_M: 12
