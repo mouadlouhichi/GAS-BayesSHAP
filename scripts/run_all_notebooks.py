@@ -16,6 +16,8 @@ data/winequality-white.csv or network access) and the experiment deps
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -40,6 +42,29 @@ NOTEBOOKS = {
     ],
 }
 
+# notebook -> (artifact dirs whose comparison.csv / *.png get copied to main_results)
+ARTIFACT_DIRS = {
+    "notebooks/SHAP_WINE_GAS.ipynb": ["results/wine_tierA"],
+    "notebooks/AIR_QUALITY_GAS.ipynb": ["results/air_quality_tierA", "results/air_quality_tierB"],
+}
+
+
+def collect_artifacts(nb_rel: str) -> None:
+    """Copy the executed notebook + its comparison CSVs/PNGs into main_results/."""
+    main_results = ROOT / "main_results"
+    main_results.mkdir(parents=True, exist_ok=True)
+    # 1) the executed notebook itself
+    shutil.copy2(ROOT / nb_rel, main_results / Path(nb_rel).name)
+    # 2) generated comparison tables / figures
+    for d in ARTIFACT_DIRS.get(nb_rel, []):
+        src_dir = ROOT / d
+        if not src_dir.is_dir():
+            continue
+        for f in sorted(src_dir.iterdir()):
+            if f.suffix.lower() in (".csv", ".png", ".jpg", ".json"):
+                shutil.copy2(f, main_results / f.name)
+                print(f"  [collect] {f.name} -> main_results/")
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build + execute all experiment notebooks")
@@ -59,7 +84,6 @@ def main() -> int:
         for builder, nb_path in NOTEBOOKS[group]:
             nb_path = ROOT / nb_path
             if builder:
-                import subprocess
                 print(f"\n[build] {builder}")
                 r = subprocess.run([sys.executable, str(ROOT / builder)], cwd=ROOT)
                 if r.returncode != 0:
@@ -84,12 +108,15 @@ def main() -> int:
                     rc = 1
                 else:
                     print(f"[OK  ] {nb_path.name}: executed with 0 errors")
+                    collect_artifacts(str(nb_path.relative_to(ROOT)))
             except Exception as exc:
                 print(f"[FAIL] {nb_path.name}: {type(exc).__name__} {str(exc)[:200]}")
                 rc = 1
 
     print("\n" + "=" * 60)
     print("ALL NOTEBOOKS DONE" if rc == 0 else "SOME NOTEBOOKS FAILED")
+    if rc == 0:
+        print(f"Results collected in {ROOT / 'main_results'}")
     return rc
 
 
