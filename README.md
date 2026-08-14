@@ -91,6 +91,10 @@ jupyter nbconvert --to notebook --execute notebooks/run_all.ipynb
 # Tier-A wine experiment: exact Shapley (2^11) + certified GAS-BayesSHAP
 # attributions vs TreeSHAP / KernelSHAP / SamplingSHAP
 jupyter nbconvert --to notebook --execute notebooks/SHAP_WINE_GAS.ipynb
+
+# Beijing air-quality experiment: Tier A (M=11 exact) + Tier B
+# (group-lag M=66 -> M_group=11 exact) with certified regime attributions
+jupyter nbconvert --to notebook --execute notebooks/AIR_QUALITY_GAS.ipynb
 ```
 
 ## Tests
@@ -164,6 +168,8 @@ notebooks/        run_all.ipynb (engine demo, executed)
                   SHAP_WINE_CODE.ipynb (previous-work wine baseline, executed)
                   SHAP_WINE_GAS.ipynb (Tier-A wine exact ground-truth +
                   certified GAS-BayesSHAP comparison, executed)
+                  AIR_QUALITY_GAS.ipynb (Beijing air-quality Tier A M=11
+                  exact + Tier B group-lag M=66->11 certified, executed)
 specs/            authoritative v11.0 specs + analysis
 ```
 
