@@ -88,12 +88,10 @@ python scripts/run_all.py --M 5
 # notebook (17 sections + status dashboard)
 jupyter nbconvert --to notebook --execute notebooks/run_all.ipynb
 
-# Tier-A wine experiment: exact Shapley (2^11) + certified GAS-BayesSHAP
-# attributions vs TreeSHAP / KernelSHAP / SamplingSHAP
+# RUN ALL experiment notebooks (build + execute) in one command:
+python scripts/run_all_notebooks.py
+# or individually:
 jupyter nbconvert --to notebook --execute notebooks/SHAP_WINE_GAS.ipynb
-
-# Beijing air-quality experiment: Tier A (M=11 exact) + Tier B
-# (group-lag M=66 -> M_group=11 exact) with certified regime attributions
 jupyter nbconvert --to notebook --execute notebooks/AIR_QUALITY_GAS.ipynb
 ```
 

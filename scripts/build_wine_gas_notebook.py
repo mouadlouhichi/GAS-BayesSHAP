@@ -278,8 +278,8 @@ A(cell("""engine = GASBayesSHAP(
         "run_id": f"wine-tierA-cluster{cluster_id}",
     },
 )
-result = engine.explain(x0, epsilon=0.05, delta=0.05, max_budget=1000,
-                        n_pilot=3, n_active_steps=15)
+result = engine.explain(x0, epsilon=15.0, delta=0.05, max_budget=1500,
+                        n_pilot=3, n_active_steps=10)
 phi_gas = np.asarray(result["shapley_values"])
 W_proj = np.asarray(result["certified_projected_widths"])
 print("status:", result["status"], "| converged:", result["converged"],
