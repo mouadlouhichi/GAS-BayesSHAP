@@ -35,9 +35,4 @@ def setup_logger(
     err_handler.setFormatter(fmt)
     err_handler.setLevel(logging.WARNING)
     logger.addHandler(err_handler)
-
-    console = logging.StreamHandler()
-    console.setFormatter(logging.Formatter("%(levelname)s | %(message)s"))
-    console.setLevel(getattr(logging, level.upper(), logging.INFO))
-    logger.addHandler(console)
     return logger

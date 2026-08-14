@@ -22,6 +22,8 @@ are additive engineering (spec sections 33-52).
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -207,6 +209,17 @@ class GASBayesSHAP:
                 "num_model_evals": self.oracle.total_model_evals,
                 "iteration": 0,
             })
+            # stdlib logger -> run.log / errors.log (spec section 37);
+            # unique per-instance name so cached loggers never collide
+            from ..logging.logger import setup_logger
+            self._run_logger = setup_logger(
+                run_log_dir, name=f"gas_bayesshap.{self.run_id}.{id(self)}",
+                level=cfg.get("log_level", "INFO"),
+            )
+            # wire the oracle's event logger (oracle_calls.jsonl)
+            self.oracle.logger = self._event_logger
+        else:
+            self._run_logger = None
 
         if cfg.get("cache_enabled", True) and self._cache is None:
             cache_path = None
@@ -236,7 +249,21 @@ class GASBayesSHAP:
         self._results_dir = results_dir
         self._prepared = True
 
-    def _log_event(self, stage: str, event: str, status: str = "", **fields) -> None:
+    def _log_event(
+        self,
+        stage: str,
+        event: str,
+        status: str = "",
+        topic: str = "events",
+        **fields,
+    ) -> None:
+        """Structured event logging: JSONL topic files + run.log mirror.
+
+        ``topic`` selects the per-topic JSONL file (spec section 37):
+        oracle_calls / gp_updates / acquisition / residual_sampling / neyman /
+        certification / checkpoints / events.  Events are also mirrored to the
+        stdlib ``run.log`` and WARNING+ to ``errors.log``.
+        """
         if self._event_logger is not None:
             self._event_logger.set_stage(stage)
             self._event_logger.set_counters(
@@ -244,7 +271,17 @@ class GASBayesSHAP:
                 num_model_evals=self.oracle.total_model_evals,
                 iteration=self.state.iteration,
             )
-            self._event_logger.event("events", event=event, status=status, **fields)
+            self._event_logger.event(topic, event=event, status=status, **fields)
+        if self._run_logger is not None:
+            level = logging.WARNING if status in ("WARNING", "ERROR", "MISSING_STRATA") else logging.INFO
+            self._run_logger.log(
+                level,
+                "[%s] %s%s%s",
+                stage,
+                event,
+                f" | {status}" if status else "",
+                f" | {json.dumps(fields, default=str)[:300]}" if fields else "",
+            )
 
     # ======================================================================= #
     # Public API
@@ -383,6 +420,7 @@ class GASBayesSHAP:
             upd = rank1_inverse_update_detailed(inv_K_DD, k_vec, self.kernel.k_self(), eta_sq)
             if not upd.ok:
                 self._log_event(STAGE_ACTIVE_GP, "near_duplicate", "SKIPPED",
+                                topic="gp_updates",
                                 coalition=bool_mask_to_int(S), schur=upd.schur,
                                 threshold=upd.threshold, action=upd.action)
                 return False
@@ -398,8 +436,9 @@ class GASBayesSHAP:
             v_val = self.oracle.evaluate(x, S_seed)
             ok = _try_add(S_seed, v_val)
             self._log_event(STAGE_GP_INIT, "seed_evaluated", "OK" if ok else "SKIPPED",
-                            coalition=bool_mask_to_int(S_seed))
+                            topic="gp_updates", coalition=bool_mask_to_int(S_seed))
         self._log_event(STAGE_GP_INIT, "seeds_complete", "OK",
+                        topic="gp_updates",
                         n_seeds=len(seeds), n_accepted=len(D_gp_coalitions))
 
         # --- active acquisition -------------------------------------------- #
@@ -418,6 +457,7 @@ class GASBayesSHAP:
                 ok = _try_add(best_S, v_val)
                 self._log_event(STAGE_ACTIVE_GP, "acquisition",
                                 "OK" if ok else "SKIPPED",
+                                topic="acquisition",
                                 coalition=bool_mask_to_int(best_S), score=best_score,
                                 n_gp=len(D_gp_coalitions))
 
@@ -455,9 +495,11 @@ class GASBayesSHAP:
         posterior_variances = np.maximum(np.diag(phi_cov_mb), 1e-10)
 
         self._log_event(STAGE_BOUNDED_SURROGATE, "bounded_surrogate", "OK",
+                        topic="gp_updates",
                         h_lb=h_lb, h_ub=h_ub, lambda_=scale, c=shift,
                         n_gp=len(D_gp_coalitions))
         self._log_event(STAGE_SURROGATE_SHAPLEY, "surrogate_shapley", "OK",
+                        topic="gp_updates",
                         phi_m_D=phi_m_D.tolist(),
                         posterior_std=np.sqrt(posterior_variances).tolist())
 
@@ -535,7 +577,8 @@ class GASBayesSHAP:
             )
             sigma_res[M - 1, missing_i] = 0.0
 
-        self._log_event(STAGE_RESIDUAL_PILOT, "extreme_strata", "OK", n_calls=2 * M + 2)
+        self._log_event(STAGE_RESIDUAL_PILOT, "extreme_strata", "OK",
+                        topic="residual_sampling", n_calls=2 * M + 2)
 
         # ---- pilot: interior strata ------------------------------------------- #
         for s in range(1, max(1, M - 1)):
@@ -564,7 +607,8 @@ class GASBayesSHAP:
                             value=remove_one_residual(v_S, v_Sm, m_S, m_Sm),
                             iteration=0, random_seed=None,
                         )
-        self._log_event(STAGE_RESIDUAL_PILOT, "pilot_complete", "OK", n_records=store.n_records)
+        self._log_event(STAGE_RESIDUAL_PILOT, "pilot_complete", "OK",
+                        topic="residual_sampling", n_records=store.n_records)
 
         # ---- sigma_res + initial Neyman ---------------------------------------- #
         for s in range(1, max(1, M - 1)):
@@ -574,6 +618,7 @@ class GASBayesSHAP:
         self.state.stage = STAGE_NEYMAN
         neyman = solve_coupled_neyman_allocation(sigma_res, M, K_cert=1.0)
         self._log_event(STAGE_NEYMAN, "neyman_allocated", "OK",
+                        topic="neyman",
                         probabilities=neyman.probabilities.tolist(),
                         objective=neyman.objective_value,
                         optimizer_status=neyman.status, message=neyman.message,
@@ -621,6 +666,7 @@ class GASBayesSHAP:
             raw_widths = residual_widths(store, sigma_res, M, delta, R_delta_res)
             check = anytime_check(raw_widths, epsilon)
             self._log_event(STAGE_ADAPTIVE, "width_check", "INFO",
+                            topic="certification",
                             widths=raw_widths.tolist(), max_width=check.max_width,
                             mean_width=check.mean_width, median_width=check.median_width,
                             argmax=check.argmax_feature, converged=check.converged,
@@ -648,6 +694,7 @@ class GASBayesSHAP:
             if current_stage2_evals + round_cost_upper > max_budget:
                 budget_exhausted = True
                 self._log_event(STAGE_ADAPTIVE, "budget_exhausted", "BUDGET_EXHAUSTED",
+                                topic="certification",
                                 current_stage2_evals=current_stage2_evals,
                                 round_cost_upper=round_cost_upper, max_budget=max_budget)
                 # leave a residual checkpoint so resume continues the adaptive loop
@@ -657,6 +704,7 @@ class GASBayesSHAP:
             if max_rounds is not None and iter_count >= int(max_rounds):
                 budget_exhausted = True
                 self._log_event(STAGE_ADAPTIVE, "max_rounds_reached", "BUDGET_EXHAUSTED",
+                                topic="certification",
                                 max_rounds=int(max_rounds))
                 self._checkpoint_residual(store, sigma_res, neyman, iteration=iter_count, widths=raw_widths)
                 break
@@ -669,6 +717,7 @@ class GASBayesSHAP:
                         sigma_res[s, i] = safe_std(store.values(i, s), 0.5)
                 neyman = solve_coupled_neyman_allocation(sigma_res, M, K_cert=1.0)
                 self._log_event(STAGE_NEYMAN, "neyman_refresh", "OK",
+                                topic="neyman",
                                 iteration=iter_count,
                                 previous_probabilities=prev_probs.tolist(),
                                 updated_probabilities=neyman.probabilities.tolist(),
@@ -717,6 +766,7 @@ class GASBayesSHAP:
                         sigma_res[s_target - 1, i] = safe_std(store.values(i, s_target - 1), 0.5)
 
             self._log_event(STAGE_ADAPTIVE, "residual_round", "OK", iteration=iter_count,
+                            topic="residual_sampling",
                             s_target=s_target, coalition=bool_mask_to_int(S_new),
                             n_records=store.n_records)
 
@@ -730,6 +780,7 @@ class GASBayesSHAP:
         missing_strata = not bool(np.all(np.isfinite(raw_widths)))
         if missing_strata:
             self._log_event(STAGE_ADAPTIVE, "missing_strata", "MISSING_STRATA",
+                            topic="certification",
                             widths=raw_widths.tolist(),
                             strict=cfg.get("certification_mode", "STRICT"))
         self.state.iteration = iter_count

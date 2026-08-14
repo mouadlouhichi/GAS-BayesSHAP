@@ -97,7 +97,7 @@ class CoalitionOracle:
     # ------------------------------------------------------------------ #
     def _log(self, event: str, **fields) -> None:
         if self.logger is not None and hasattr(self.logger, "event"):
-            self.logger.event("oracle", event=event, **fields)
+            self.logger.event("oracle_calls", event=event, **fields)
 
     def evaluate(self, x: np.ndarray, coalition: np.ndarray) -> float:
         """Evaluate ``v(S)`` for coalition mask ``S`` (exact accounting)."""

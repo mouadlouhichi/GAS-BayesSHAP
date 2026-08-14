@@ -118,7 +118,7 @@ def validate_config(cfg: Mapping[str, Any]) -> Dict[str, Any]:
         if not (isinstance(bounds, (list, tuple)) and len(bounds) == 2):
             raise ConfigError("output_bounds must be [L, U] or null")
         L, U = float(bounds[0]), float(bounds[1])
-        if not (L < U) or not all(np_finite(L, U)):
+        if not (L < U) or not np_finite(L, U):
             raise ConfigError(f"output_bounds must satisfy -inf < L < U < inf, got ({L}, {U})")
         cfg["output_bounds"] = (L, U)
     return cfg
@@ -130,7 +130,13 @@ def np_finite(*values):
 
 
 def load_config(path: Optional[os.PathLike] = None, overrides: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
-    """Load a YAML config file, merge over defaults and apply overrides."""
+    """Load a YAML config file, merge over defaults and apply overrides.
+
+    A flat YAML mapping of config keys is expected.  Files with nested
+    top-level mappings (preset libraries such as ``configs/games.yaml`` or
+    ``configs/experiments.yaml``) are rejected with a helpful message; use
+    :func:`load_game_preset` to apply a named game preset.
+    """
     cfg = copy.deepcopy(DEFAULTS)
     if path is not None:
         p = Path(path)
@@ -142,6 +148,13 @@ def load_config(path: Optional[os.PathLike] = None, overrides: Optional[Mapping[
             raise ConfigError(f"config file {p} must contain a YAML mapping")
         for k, v in loaded.items():
             if k not in DEFAULTS:
+                if isinstance(v, (dict, list)):
+                    raise ConfigError(
+                        f"config file {p} looks like a preset library (key '{k}' "
+                        f"is a {'mapping' if isinstance(v, dict) else 'list'}), "
+                        f"not a flat run config; load a named preset with "
+                        f"load_game_preset('{k}') or use a flat YAML"
+                    )
                 raise ConfigError(f"unknown config key '{k}' in {p}")
             cfg[k] = v
     if overrides:
@@ -149,6 +162,33 @@ def load_config(path: Optional[os.PathLike] = None, overrides: Optional[Mapping[
             if k not in DEFAULTS:
                 raise ConfigError(f"unknown config override '{k}'")
             cfg[k] = v
+    return validate_config(cfg)
+
+
+def load_game_preset(
+    game: str,
+    base: Optional[Mapping[str, Any]] = None,
+    presets_path: Optional[os.PathLike] = None,
+) -> Dict[str, Any]:
+    """Load a named domain-game preset from ``configs/games.yaml``.
+
+    Returns the base config (defaults, or ``base`` if given) with the preset
+    keys merged in — e.g. the ``membership`` preset sets
+    ``domain_game: membership`` and ``output_bounds: [0, 1]`` so runs are
+    rigorous by default.
+    """
+    path = Path(presets_path) if presets_path else Path(__file__).resolve().parents[2] / "configs" / "games.yaml"
+    if not path.exists():
+        raise ConfigError(f"game presets file not found: {path}")
+    with open(path, "r", encoding="utf-8") as fh:
+        presets = yaml.safe_load(fh) or {}
+    if not isinstance(presets, dict) or game not in presets:
+        raise ConfigError(f"unknown game preset '{game}' in {path} (available: {sorted(presets)})")
+    cfg = dict(base) if base is not None else copy.deepcopy(DEFAULTS)
+    for k, v in presets[game].items():
+        if k not in DEFAULTS:
+            raise ConfigError(f"unknown preset key '{k}' for game '{game}'")
+        cfg[k] = v
     return validate_config(cfg)
 
 

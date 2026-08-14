@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import numpy as np
 
 from gas_bayesshap import GASBayesSHAP
-from gas_bayesshap.utils.config import ConfigError, load_config
+from gas_bayesshap.utils.config import ConfigError, load_config, validate_config
 from gas_bayesshap.utils.serialization import write_json_atomic
 
 
@@ -123,7 +123,17 @@ def main() -> int:
             overrides[dst] = val
 
     try:
-        cfg = load_config(args.config, overrides=overrides)
+        if args.game is not None:
+            # apply the named game preset (domain_game + output_bounds) on top
+            # of the base config, then let explicit CLI overrides win
+            from gas_bayesshap.utils.config import load_game_preset
+            base = load_config(args.config)
+            overrides.pop("domain_game", None)
+            cfg = load_game_preset(args.game, base=base)
+            cfg.update(overrides)
+            cfg = validate_config(cfg)
+        else:
+            cfg = load_config(args.config, overrides=overrides)
     except ConfigError as e:
         print(f"config error: {e}", file=sys.stderr)
         return 2
