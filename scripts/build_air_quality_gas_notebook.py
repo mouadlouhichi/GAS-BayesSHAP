@@ -153,15 +153,55 @@ def load_air():
         return pd.read_csv(combined)
 
     zip_path = os.path.join(DATA_DIR, "Beijing_MultiSite_AirQuality.zip")
-    # 2) download the UCI multi-site ZIP into data/ (cached for later runs)
+    # 2) download the UCI multi-site ZIP into data/ (cached for later runs).
+    #    The official UCI static URL can redirect to a WRONG archive (e.g. a
+    #    stock-market CSV), so every downloaded ZIP is validated: it must
+    #    contain the 11 expected air-quality features after concatenation.
+    def _zip_is_valid(zpath):
+        try:
+            with zipfile.ZipFile(zpath) as z:
+                names = [n for n in z.namelist() if n.endswith(".csv")]
+                if not names:
+                    return False
+                probe = pd.concat(
+                    [pd.read_csv(z.open(n)).assign(station=os.path.splitext(os.path.basename(n))[0])
+                     for n in names], ignore_index=True)
+                return set(FEATURES).issubset(probe.columns)
+        except Exception:
+            return False
+
     if not os.path.exists(zip_path):
         print("Downloading Beijing multi-site air-quality dataset ...")
         mirrors = [
+            # official UCI locations (may redirect to a wrong archive)
             "https://archive.ics.uci.edu/static/public/501/beijing+multi-site+air-quality+data.zip",
             "https://archive.ics.uci.edu/ml/machine-learning-databases/00501/Beijing_MultiSite_AirQuality.zip",
         ]
-        if not any(_download(u, zip_path) for u in mirrors):
-            print("All downloads failed -> using SYNTHETIC regime-structured fallback (offline sandbox).")
+        ok = False
+        for u in mirrors:
+            tmp_zip = zip_path + ".tmp"
+            if _download(u, tmp_zip):
+                if u.endswith(".csv"):
+                    try:
+                        probe = pd.read_csv(tmp_zip)
+                        if set(FEATURES).issubset(probe.columns):
+                            os.replace(tmp_zip, zip_path)  # keep as cache
+                            ok = True
+                            break
+                    except Exception:
+                        pass
+                    if os.path.exists(tmp_zip):
+                        os.remove(tmp_zip)
+                elif _zip_is_valid(tmp_zip):
+                    os.replace(tmp_zip, zip_path)
+                    ok = True
+                    break
+                else:
+                    print("  mirror returned an INVALID archive (wrong content) - skipping")
+                    if os.path.exists(tmp_zip):
+                        os.remove(tmp_zip)
+        if not ok:
+            print("All downloads failed or were invalid -> using SYNTHETIC regime-structured fallback (offline sandbox).")
             DATA_SOURCE = "synthetic-fallback"
             return _synthetic_air()
 
@@ -175,6 +215,14 @@ def load_air():
                 tmp["station"] = os.path.splitext(os.path.basename(nm))[0]
             frames.append(tmp)
         df = pd.concat(frames, ignore_index=True)
+
+    # validate the combined table once more before proceeding
+    if not set(FEATURES).issubset(df.columns):
+        print("combined download does NOT contain the 11 air-quality features:",
+              list(df.columns)[:12])
+        print("-> using SYNTHETIC regime-structured fallback.")
+        DATA_SOURCE = "synthetic-fallback"
+        return _synthetic_air()
 
     time_cols = ["year", "month", "day", "hour"]
     if all(c in df.columns for c in time_cols):
