@@ -79,31 +79,57 @@ from gas_bayesshap.game.brute_force import exact_game_values, exact_shapley_from
 from gas_bayesshap.benchmarking.metrics import rmse, mae, max_abs_error
 from gas_bayesshap.benchmarking.monte_carlo import monte_carlo_shapley
 
+DATA_DIR = os.path.join("..", "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+DATA_DIR = os.path.join("..", "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 DATA_SOURCE = "unknown"
+WINE_FEATURES = ["fixed acidity", "volatile acidity", "citric acid", "residual sugar",
+                 "chlorides", "free sulfur dioxide", "total sulfur dioxide", "density",
+                 "pH", "sulphates", "alcohol"]
 
+# Download url to dest (cached for later runs). Returns True on success.
+def _download(url, dest, timeout=30):
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (GAS-BayesSHAP notebook)"})
+        with urllib.request.urlopen(req, timeout=timeout) as r, open(dest, "wb") as f:
+            f.write(r.read())
+        print(f"  downloaded {os.path.getsize(dest) / 1e6:.2f} MB -> {dest}")
+        return True
+    except Exception as exc:
+        print(f"  download failed ({url}): {type(exc).__name__} {str(exc)[:80]}")
+        return False
+
+def _synthetic_wine(n=1500, seed=1301):
+    rng = np.random.RandomState(seed)
+    X = rng.randn(n, len(WINE_FEATURES))
+    df = pd.DataFrame(X, columns=WINE_FEATURES)
+    df["quality"] = rng.randint(3, 9, n)
+    return df
+
+# Load the UCI white-wine dataset: cached data/ -> download from mirrors -> synthetic.
 def load_wine():
     global DATA_SOURCE
-    local = os.path.join("..", "data", "winequality-white.csv")
-    if os.path.exists(local):
-        DATA_SOURCE = f"local:{local}"
-        return pd.read_csv(local, sep=";")
-    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv"
-    try:
-        df = pd.read_csv(url, sep=";")
-        DATA_SOURCE = f"url:{url}"
-        return df
-    except Exception as exc:
-        print("Network unavailable -> using SYNTHETIC wine-like fallback (offline sandbox).", exc)
-        DATA_SOURCE = "synthetic-fallback"
-        rng = np.random.RandomState(1301)
-        n = 1500
-        cols = ["fixed acidity", "volatile acidity", "citric acid", "residual sugar",
-                "chlorides", "free sulfur dioxide", "total sulfur dioxide", "density",
-                "pH", "sulphates", "alcohol"]
-        X = rng.randn(n, len(cols))
-        df = pd.DataFrame(X, columns=cols)
-        df["quality"] = rng.randint(3, 9, n)
-        return df
+    cached = os.path.join(DATA_DIR, "winequality-white.csv")
+    # 1) cached local copy (previous download or user-provided)
+    if os.path.exists(cached):
+        DATA_SOURCE = f"cache:{cached}"
+        return pd.read_csv(cached, sep=";")
+    # 2) download from mirrors into data/ (cached for later runs)
+    print("Downloading wine dataset ...")
+    mirrors = [
+        "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv",
+        "https://raw.githubusercontent.com/plotly/datasets/master/winequality-white.csv",
+    ]
+    for url in mirrors:
+        if _download(url, cached):
+            DATA_SOURCE = f"url:{url} (cached to {cached})"
+            return pd.read_csv(cached, sep=";")
+    # 3) synthetic fallback (offline sandbox)
+    print("All downloads failed -> using SYNTHETIC wine-like fallback (offline sandbox).")
+    DATA_SOURCE = "synthetic-fallback"
+    return _synthetic_wine()
 
 df = load_wine()
 print("Dataset shape:", df.shape, "| source:", DATA_SOURCE)
@@ -333,8 +359,10 @@ A(md("## Summary\n\n"
      "in the table above.\n"
      "- TreeSHAP explains the logit, KernelSHAP/SamplingSHAP explain the probability game — only "
      "GAS-BayesSHAP carries the anytime certification guarantee.\n"
-     "- To run on the real wine data: place `winequality-white.csv` at `data/winequality-white.csv` "
-     "or allow network access; the loader prefers local → URL → synthetic fallback."))
+     "- **Data download:** the loader now downloads `winequality-white.csv` into `data/` from "
+     "multiple mirrors (UCI archive, GitHub mirror) and caches it, so re-runs skip the network. "
+     "Place a local copy at `data/winequality-white.csv` to bypass download; the synthetic "
+     "fallback is used only when offline."))
 
 nb = {
     "cells": C,

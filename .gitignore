@@ -26,3 +26,8 @@ checkpoints/
 # CI workflow prepared but unpushable (GitHub App lacks `workflows` permission);
 # keep it out of the tree until permissions allow, then `git add -f`.
 .github/
+
+# per-experiment generated artifacts (synthetic-fallback CSVs/PNGs)
+results/wine_tierA/
+results/air_quality_tierA/
+results/air_quality_tierB/

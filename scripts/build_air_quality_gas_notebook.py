@@ -92,7 +92,23 @@ from gas_bayesshap.benchmarking.monte_carlo import monte_carlo_shapley
 from gas_bayesshap.game.domain_games import group_lag_game, build_group_lags
 
 FEATURES = ["PM2.5", "PM10", "SO2", "NO2", "CO", "O3", "TEMP", "PRES", "DEWP", "RAIN", "WSPM"]
+DATA_DIR = os.path.join("..", "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 DATA_SOURCE = "unknown"
+
+# Download url to dest (cached for later runs). Returns True on success.
+def _download(url, dest, timeout=40):
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (GAS-BayesSHAP notebook)"})
+        with urllib.request.urlopen(req, timeout=timeout) as r, open(dest, "wb") as f:
+            f.write(r.read())
+        print(f"  downloaded {os.path.getsize(dest) / 1e6:.2f} MB -> {dest}")
+        return True
+    except Exception as exc:
+        print(f"  download failed ({url}): {type(exc).__name__} {str(exc)[:80]}")
+        return False
+
 
 
 def _synthetic_air(n=3000, seed=1301):
@@ -126,37 +142,51 @@ def _synthetic_air(n=3000, seed=1301):
     return df
 
 
+# Load the Beijing multi-site air-quality dataset:
+# cached data/ CSV -> cached ZIP (download from mirrors) -> synthetic.
 def load_air():
     global DATA_SOURCE
-    local = os.path.join("..", "data", "Beijing_MultiSite_AirQuality.csv")
-    if os.path.exists(local):
-        df = pd.read_csv(local)
-        DATA_SOURCE = f"local:{local}"
-        return df
-    urls = [
-        "https://archive.ics.uci.edu/static/public/501/beijing+multi-site+air-quality+data.zip",
-        "https://archive.ics.uci.edu/ml/machine-learning-databases/00501/Beijing_MultiSite_AirQuality.zip",
-    ]
-    for url in urls:
-        try:
-            import urllib.request
-            raw = urllib.request.urlopen(url, timeout=20).read()
-            with zipfile.ZipFile(io.BytesIO(raw)) as z:
-                csv_names = [n for n in z.namelist() if n.endswith(".csv")]
-                frames = []
-                for nm in csv_names:
-                    tmp = pd.read_csv(z.open(nm))
-                    if "station" not in tmp.columns:
-                        tmp["station"] = os.path.splitext(os.path.basename(nm))[0]
-                    frames.append(tmp)
-                df = pd.concat(frames, ignore_index=True)
-            DATA_SOURCE = f"url:{url}"
-            return df
-        except Exception as exc:
-            print("URL failed:", url, "->", type(exc).__name__)
-    print("Network unavailable -> using SYNTHETIC regime-structured fallback (offline sandbox).")
-    DATA_SOURCE = "synthetic-fallback"
-    return _synthetic_air()
+    combined = os.path.join(DATA_DIR, "Beijing_MultiSite_AirQuality.csv")
+    # 1) cached combined CSV (previous download or user-provided)
+    if os.path.exists(combined):
+        DATA_SOURCE = f"cache:{combined}"
+        return pd.read_csv(combined)
+
+    zip_path = os.path.join(DATA_DIR, "Beijing_MultiSite_AirQuality.zip")
+    # 2) download the UCI multi-site ZIP into data/ (cached for later runs)
+    if not os.path.exists(zip_path):
+        print("Downloading Beijing multi-site air-quality dataset ...")
+        mirrors = [
+            "https://archive.ics.uci.edu/static/public/501/beijing+multi-site+air-quality+data.zip",
+            "https://archive.ics.uci.edu/ml/machine-learning-databases/00501/Beijing_MultiSite_AirQuality.zip",
+        ]
+        if not any(_download(u, zip_path) for u in mirrors):
+            print("All downloads failed -> using SYNTHETIC regime-structured fallback (offline sandbox).")
+            DATA_SOURCE = "synthetic-fallback"
+            return _synthetic_air()
+
+    # 3) extract + combine ALL station CSVs (multi-site), then sort by station/time
+    with zipfile.ZipFile(zip_path) as z:
+        csv_names = [n for n in z.namelist() if n.endswith(".csv")]
+        frames = []
+        for nm in csv_names:
+            tmp = pd.read_csv(z.open(nm))
+            if "station" not in tmp.columns:
+                tmp["station"] = os.path.splitext(os.path.basename(nm))[0]
+            frames.append(tmp)
+        df = pd.concat(frames, ignore_index=True)
+
+    time_cols = ["year", "month", "day", "hour"]
+    if all(c in df.columns for c in time_cols):
+        if "station" in df.columns:
+            df = df.sort_values(["station"] + time_cols).reset_index(drop=True)
+        else:
+            df = df.sort_values(time_cols).reset_index(drop=True)
+
+    # cache the combined CSV for fast re-runs
+    df.to_csv(combined, index=False)
+    DATA_SOURCE = f"url-zip (cached to {combined})"
+    return df
 
 
 df = load_air()
@@ -542,8 +572,10 @@ A(md("## Summary\n\n"
      "coalitions; GAS-BayesSHAP certifies the 11 macro-players (per-variable lag blocks).\n"
      "- TreeSHAP explains the logit, KernelSHAP/SamplingSHAP explain the probability game — only "
      "GAS-BayesSHAP carries the anytime certification guarantee.\n"
-     "- To run on the real Beijing multi-site data: place `Beijing_MultiSite_AirQuality.csv` at "
-     "`data/` or allow network access; the loader prefers local → UCI zip → synthetic fallback."))
+     "- **Data download:** the loader downloads the UCI Beijing multi-site ZIP into `data/`, "
+     "combines ALL station CSVs (multi-site, station column added), sorts by station/time, "
+     "and caches the combined CSV for fast re-runs.  Place a local copy at "
+     "`data/Beijing_MultiSite_AirQuality.csv` to bypass download; synthetic fallback only when offline."))
 
 nb = {
     "cells": C,
