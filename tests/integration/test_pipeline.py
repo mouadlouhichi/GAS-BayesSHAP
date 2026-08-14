@@ -21,6 +21,11 @@ REQUIRED_KEYS = [
     "uncertified_features", "sign_certified_features",
     "run_id", "M", "domain_game", "config_hash", "oracle_hash",
     "background_hash", "git_commit",
+    # audit extensions: per-call vs run-total accounting + completeness
+    "num_coalition_evals_this_call", "num_coalition_evals_run_total",
+    "num_model_evals_this_call", "num_model_evals_run_total",
+    "baseline_model_evals", "num_model_evals_end_to_end",
+    "point_estimate_complete", "missing_cells_by_feature",
 ]
 
 

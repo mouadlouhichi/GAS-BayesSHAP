@@ -119,6 +119,17 @@ def test_silhouette_game():
     assert -1.0 <= v_full <= 1.0
 
 
+def test_silhouette_guard_degenerate_labels():
+    """silhouette_score needs 2 <= n_labels <= n_samples-1; degenerate cases
+    must return 0.0 instead of raising."""
+    rng = np.random.RandomState(1)
+    # 3 samples only -> n_labels == n_samples for k=3 is degenerate
+    X = np.array([[0.0, 0.0], [0.1, 0.1], [10.0, 10.0]])
+    oracle, _ = silhouette_game(X, n_clusters=3, random_state=0)
+    v = oracle.evaluate(None, np.ones(2, dtype=bool))
+    assert v == 0.0  # degenerate label count -> 0, not an exception
+
+
 def test_group_lag_masks():
     groups = build_group_lags(n_vars=2, lags=(0, 1, 3))
     assert len(groups) == 2

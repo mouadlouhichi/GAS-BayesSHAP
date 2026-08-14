@@ -20,6 +20,13 @@ class CheckpointCompatibilityError(RuntimeError):
     """Raised when a checkpoint is incompatible with the current run."""
 
 
+class CheckpointIntegrityError(RuntimeError):
+    """Raised when a checkpoint's stored payload or files fail integrity
+    verification (hash mismatch / corrupted bytes).  Atomic writes protect
+    against partial writes; this protects against post-write corruption,
+    manual tampering, or truncated-but-parseable arrays."""
+
+
 def verify_compatibility(
     state: Dict[str, Any],
     config_hash: str,

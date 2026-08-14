@@ -11,6 +11,16 @@ class NumericalFailure(RuntimeError):
     """Raised when a numerical invariant is violated (NaN/Inf/singularity)."""
 
 
+class OutputBoundViolation(RuntimeError):
+    """Raised when an oracle output violates the declared output bounds.
+
+    The anytime certification guarantee is only valid if the game really lies
+    in ``[L, U]`` (spec Remark 2.2 / section 22).  A value outside the
+    declared range — or a non-finite value — breaks that contract and must
+    never be silently accepted.
+    """
+
+
 def assert_finite(arr, name: str = "array") -> None:
     """Raise NumericalFailure if ``arr`` contains NaN or Inf."""
     a = np.asarray(arr, dtype=np.float64)

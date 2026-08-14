@@ -47,6 +47,14 @@ class CoalitionOracle:
         stored value without incrementing counters.
     config_hash:
         Configuration hash included in cache keys.
+    model_artifact_hash:
+        Optional digest of the model artifact (fitted parameters, state_dict,
+        model-file digest, ...).  When provided, the oracle identity includes
+        it so parameter-distinct models are never cache/checkpoint-compatible.
+        When ``model_tag`` is also provided, both are part of the identity.
+    bounds_tolerance:
+        Tolerance used when enforcing the declared ``output_bounds`` contract
+        (a violation raises :class:`OutputBoundViolation`).
     """
 
     def __init__(
@@ -58,6 +66,8 @@ class CoalitionOracle:
         cache: Optional[CoalitionCache] = None,
         config_hash: Optional[str] = None,
         logger=None,
+        model_artifact_hash: Optional[str] = None,
+        bounds_tolerance: float = 1e-9,
     ):
         if not callable(model_fn):
             raise TypeError("model_fn must be callable")
@@ -73,15 +83,27 @@ class CoalitionOracle:
             if not (np.isfinite(L) and np.isfinite(U) and L < U):
                 raise ValueError(f"output_bounds must satisfy -inf < L < U < inf, got {(L, U)}")
             self.output_bounds = (L, U)
+        self.bounds_tolerance = float(bounds_tolerance)
 
         self.model_tag = model_tag if model_tag is not None else getattr(model_fn, "__name__", "model_fn")
         self.cache: Optional[CoalitionCache] = cache
         self.config_hash = config_hash or ""
         self.logger = logger
 
+        # hashes (frozen at construction).  An explicit model_tag declares
+        # model identity (authoritative, used across crash/resume with the
+        # same tag); an explicit model_artifact_hash is always included.  When
+        # no tag is given, we derive an artifact hash from the function's
+        # module + qualname + source when obtainable, so distinct lambdas
+        # (which all share the name '<lambda>') are never treated as the same
+        # model.
+        if model_artifact_hash is None and model_tag is None:
+            model_artifact_hash = _derive_model_artifact_hash(model_fn)
+        self.model_artifact_hash = model_artifact_hash
+
         # hashes (frozen at construction)
         self.background_h = background_hash(self.background)
-        self.oracle_h = oracle_hash(self.model_tag, self.background)
+        self.oracle_h = oracle_hash(self.model_tag, self.background, self.model_artifact_hash)
 
         # query meters
         self.total_coalition_evals = 0
@@ -131,24 +153,46 @@ class CoalitionOracle:
         return float(value)
 
     # ------------------------------------------------------------------ #
+    def _check_output_bounds(self, value: float) -> float:
+        """Enforce the declared output-bounds contract (spec section 22).
+
+        Raises
+        ------
+        OutputBoundViolation
+            If the value is non-finite or lies outside ``[L, U]`` (within
+            ``bounds_tolerance``) while ``output_bounds`` is declared.
+        """
+        if self.output_bounds is None:
+            return float(value)
+        L, U = self.output_bounds
+        tol = self.bounds_tolerance * max(1.0, abs(U), abs(L))
+        if not np.isfinite(value) or not (L - tol <= value <= U + tol):
+            from ..numerics.validation import OutputBoundViolation
+            raise OutputBoundViolation(
+                f"oracle output {value!r} violates declared bounds "
+                f"[{L}, {U}] (tol={tol:.1e}) — the certification contract is "
+                "broken; fix the model or the output_bounds"
+            )
+        return float(value)
+
     def _evaluate_uncached(self, x: np.ndarray, S_mask: np.ndarray) -> float:
         """Raw evaluation with the spec's model-eval shortcuts."""
         if np.all(S_mask):
             # full instance: single model pass
             self._last_model_evals = 1
             self.total_model_evals += 1
-            return float(self.model_fn(x))
+            return self._check_output_bounds(float(self.model_fn(x)))
         if not np.any(S_mask):
             # empty coalition: baseline shortcut, zero model passes
             self._last_model_evals = 0
-            return float(self.E_base)
+            return self._check_output_bounds(float(self.E_base))
 
         X_hybrid = np.tile(x, (self.B, 1))
         X_hybrid[:, ~S_mask] = self.background[:, ~S_mask]
         preds = [self.model_fn(X_hybrid[b]) for b in range(self.B)]
         self.total_model_evals += self.B
         self._last_model_evals = self.B
-        return float(np.mean(preds))
+        return self._check_output_bounds(float(np.mean(preds)))
 
     def evaluate_bitmask(self, x: np.ndarray, bitmask: int) -> float:
         from .subsets import bitmask_to_mask
@@ -183,3 +227,26 @@ def _bitmask(mask: np.ndarray) -> int:
         if m[bit]:
             bitmask |= 1 << bit
     return bitmask
+
+
+def _derive_model_artifact_hash(model_fn) -> Optional[str]:
+    """Best-effort model identity digest (module + qualname + source).
+
+    Returns None when the source is not obtainable (e.g. REPL / notebook
+    closures), in which case the caller should pass ``model_artifact_hash``
+    explicitly for strong identity.
+    """
+    import inspect
+    from ..utils.hashing import stable_hash
+    try:
+        src = inspect.getsource(model_fn)
+    except (OSError, TypeError, IOError):
+        return None
+    return stable_hash(
+        {
+            "module": getattr(model_fn, "__module__", ""),
+            "qualname": getattr(model_fn, "__qualname__", getattr(model_fn, "__name__", "")),
+            "source": src,
+        },
+        namespace="model",
+    )

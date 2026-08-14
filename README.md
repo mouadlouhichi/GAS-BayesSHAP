@@ -92,17 +92,45 @@ jupyter nbconvert --to notebook --execute notebooks/run_all.ipynb
 ## Tests
 
 ```bash
-python -m pytest tests/ -q          # 136 tests across 6 suites
+python -m pytest tests/ -q          # 173 tests across 6 suites
 ```
 
 | Suite | Coverage |
 |---|---|
 | `tests/mathematical` | Lemma D (M=1 sanity + M=2..6), Lemma E (M=2..6 incl. M=2 off-diagonal), Shapley weights, brute-force self-consistency |
 | `tests/numerical` | Sherman–Morrison vs direct inversion, near-duplicate Schur fallback, stable combinatorics, GP posterior |
-| `tests/statistical` | Tiers 3–5, 9, 10: null-player containment, coverage calibration (30 trials), inflation tightness, M=2 exactness, additive recovery, anytime widths, missing strata |
-| `tests/protocol` | Query accounting, budget guard, cache correctness + compatibility, oracle determinism, deterministic repeated runs, width vector |
-| `tests/integration` | Full 10-tier suite, parity with the spec's inline reference, pipeline/schema/status, domain games (membership, contrastive, archetype, silhouette, group-lag M=11 exact) |
-| `tests/resume` | Checkpoint/resume equivalence, corrupted/incompatible checkpoint rejection, failure injection (crash during GP/Stage-2/adaptive, NaN) |
+| `tests/statistical` | Tiers 3–5, 9, 10: null-player containment, coverage calibration (30 trials), inflation tightness, M=2 exactness, additive recovery, anytime widths, missing strata + completeness flags |
+| `tests/protocol` | Query accounting (this-call vs run-total vs end-to-end), budget guard, cache correctness + compatibility + model-identity hardening, oracle determinism + output-bounds enforcement, deterministic repeated runs, width vector, config/game presets, structured logging, evidence-based compliance audit |
+| `tests/integration` | Full 10-tier suite, parity with the spec's inline reference, pipeline/schema/status, domain games (membership, contrastive, archetype, silhouette + degenerate-label guard, group-lag M=11 exact) |
+| `tests/resume` | Checkpoint/resume equivalence, **cumulative Stage-2 budget across resume**, checkpoint payload-integrity verification + fallback, corrupted/incompatible checkpoint rejection, failure injection (crash during GP/Stage-2/adaptive, NaN) |
+
+## Audit-driven guarantees (beyond the v11.0 spec)
+
+* **Cumulative resume budget** — `max_budget` is a *run-level* Stage-2
+  allowance; a resumed run deducts pre-crash work instead of restarting with a
+  fresh budget (`stage2_attempted_total` persisted in every checkpoint).
+* **Checkpoint integrity** — every checkpoint records payload + NPZ/JSON
+  SHA-256 hashes in `checkpoint_manifest.json`; `load()` verifies them and
+  rejects corruption/tampering (`CheckpointIntegrityError`), falling back to
+  the previous valid checkpoint.
+* **Honest compliance audit** — `spec_compliance.json` statuses are
+  `IMPLEMENTED / TESTED / VALIDATED / MISSING`; the math items execute the
+  brute-force validation at audit time (evidence strings recorded), and the
+  audit accepts external test artifacts. It is no longer self-declarative.
+* **Output-bounds contract** — oracle outputs are checked against the declared
+  `[L, U]` on every evaluation (incl. non-finite rejection) and raise
+  `OutputBoundViolation`; a certificate can never be labeled rigorous for a
+  model that violates its own range.
+* **Model identity** — without an explicit `model_tag`, the oracle identity
+  includes a source-derived artifact hash (module + qualname + source), so
+  distinct lambdas (all named `<lambda>`) are never cache/checkpoint
+  compatible; pass `model_artifact_hash` for fitted-parameter digests.
+* **Complete/partial estimates** — results report
+  `point_estimate_complete` and `missing_cells_by_feature`; features with
+  unobserved strata are flagged, never silently presented as complete.
+* **Query accounting** — results report per-call *and* run-total
+  coalition/model evaluations plus `baseline_model_evals` (the `B` E_base
+  passes excluded from per-call deltas) and `num_model_evals_end_to_end`.
 
 ## Results
 
@@ -148,6 +176,18 @@ games) — the real Wine-quality / Beijing air-quality clustering pipelines
 data loaders are **not bundled**.  The CLI prints a notice whenever
 `--dataset wine|beijing_*` is used; script results are for engine validation,
 not for the paper's experimental claims.
+
+## Caveats / engineering decisions (documented)
+
+* `h_lb`/`h_ub` are **safe kernel-induced bounds** (conservative, from the
+  kernel range `[σ₀²ρ^M, σ₀²]` with α sign-splitting), not exact extrema —
+  they guarantee `m_b(S) ∈ [L, U]` for every representable coalition.
+* The coupled Neyman allocation is **approximately optimal**: the convex
+  program optimizes expected sample counts; realized counts are random.
+* Heuristic-bounds runs (`output_bounds: null`) are always flagged
+  (`range_bound_is_heuristic: true`) and never claim rigor.
+* The CLI scripts use **synthetic stand-in models** (see "Domain-model
+  pipeline status"); engine results are for validation, not paper experiments.
 
 ## Caveats / engineering decisions (documented)
 

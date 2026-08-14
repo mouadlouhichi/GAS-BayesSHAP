@@ -27,7 +27,7 @@ def test_additive_recovery_larger_M():
     w = rng.uniform(0.5, 2.0, M)
     bg = rng.randn(8, M) * 0.1
     eng = GASBayesSHAP(lambda x: float(np.dot(x, w)), bg,
-                       output_bounds=(0.0, 3.0 * M),
+                       output_bounds=(-3.0, 3.0 * M),  # hybrids can dip slightly below 0
                        rng=np.random.RandomState(7), config=ENGINE_CONFIG)
     res = eng.explain(np.ones(M), epsilon=0.15, delta=0.05, max_budget=600)
     assert np.allclose(res["shapley_values"], w, atol=0.3)

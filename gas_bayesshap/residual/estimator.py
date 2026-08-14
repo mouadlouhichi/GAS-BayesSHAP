@@ -34,3 +34,28 @@ def residual_shapley(store: StratumStore, M: int) -> np.ndarray:
 def raw_unified_estimator(phi_m_b: np.ndarray, phi_hat_r: np.ndarray) -> np.ndarray:
     """``phi_hat^raw = phi(m_b) + phi_hat(r_D)`` (both components kept)."""
     return np.asarray(phi_m_b, dtype=np.float64) + np.asarray(phi_hat_r, dtype=np.float64)
+
+
+def stratum_completeness(store: StratumStore, M: int):
+    """Per-feature stratum-coverage completeness.
+
+    Returns
+    -------
+    complete : np.ndarray of bool
+        ``complete[i]`` is True iff every cell ``(s, i)`` for
+        ``s = 0..M-1`` has at least one observation.
+    missing : dict
+        ``{i: [s, ...]}`` — the empty strata per incomplete feature.
+
+    A feature with missing strata has a *partial* point estimate (its
+    ``phi_res`` implicitly uses 0 for unobserved cells) and must never be
+    presented as fully certified.
+    """
+    complete = np.ones(M, dtype=bool)
+    missing: dict = {}
+    for i in range(M):
+        miss = [s for s in range(M) if store.count(i, s) == 0]
+        if miss:
+            complete[i] = False
+            missing[i] = miss
+    return complete, missing

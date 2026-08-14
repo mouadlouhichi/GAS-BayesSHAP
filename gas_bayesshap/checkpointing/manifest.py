@@ -30,6 +30,9 @@ class CheckpointManifest:
         if self.path.exists():
             data = load_json(self.path)
             if isinstance(data, dict):
+                data.setdefault("checkpoint_hashes", {})
+                data.setdefault("background_hash", "")
+                data.setdefault("engine_version", "")
                 return data
         return {
             "latest_valid_checkpoint": None,
@@ -39,7 +42,10 @@ class CheckpointManifest:
             "query_count": 0,
             "config_hash": "",
             "oracle_hash": "",
+            "background_hash": "",
+            "engine_version": "",
             "result_hash": "",
+            "checkpoint_hashes": {},
         }
 
     def update(
@@ -51,8 +57,18 @@ class CheckpointManifest:
         config_hash: str,
         oracle_hash: str,
         payload_hash: str,
+        background_hash: str = "",
+        engine_version: str = "",
+        npz_sha256: str = "",
+        json_sha256: str = "",
     ) -> None:
         previous = self.data.get("latest_valid_checkpoint")
+        hashes = dict(self.data.get("checkpoint_hashes", {}))
+        hashes[str(checkpoint_name)] = {
+            "payload": str(payload_hash),
+            "npz": str(npz_sha256),
+            "json": str(json_sha256),
+        }
         self.data = {
             "latest_valid_checkpoint": str(checkpoint_name),
             "previous_valid_checkpoint": previous,
@@ -61,7 +77,10 @@ class CheckpointManifest:
             "query_count": int(query_count),
             "config_hash": str(config_hash),
             "oracle_hash": str(oracle_hash),
+            "background_hash": str(background_hash),
+            "engine_version": str(engine_version),
             "result_hash": str(payload_hash),
+            "checkpoint_hashes": hashes,
         }
         self._persist()
 
@@ -72,7 +91,13 @@ class CheckpointManifest:
         name = self.data.get("latest_valid_checkpoint")
         if not name:
             return None
-        return {"name": name, **{k: v for k, v in self.data.items() if k != "latest_valid_checkpoint"}}
+        out = {k: v for k, v in self.data.items() if k != "latest_valid_checkpoint"}
+        out["name"] = name
+        return out
+
+    def integrity_record(self, checkpoint_name: str) -> Optional[Dict[str, str]]:
+        """Per-checkpoint integrity record (payload/npz/json hashes)."""
+        return self.data.get("checkpoint_hashes", {}).get(str(checkpoint_name))
 
     def to_dict(self) -> Dict[str, Any]:
         return dict(self.data)

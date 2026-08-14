@@ -8,9 +8,9 @@ from gas_bayesshap.checkpointing.compatibility import CheckpointCompatibilityErr
 
 
 # convergent settings (verified: widths reach < epsilon within budget)
-BOUNDS = (-2.0, 2.0)
-EPS = 9.0
-BUDGET = 400
+BOUNDS = (-4.0, 4.0)
+EPS = 15.0
+BUDGET = 600
 
 
 def _model(M, seed=0):
@@ -185,4 +185,4 @@ def test_resume_rejects_different_input(run_dirs):
     eng2 = GASBayesSHAP(model, bg, output_bounds=BOUNDS,
                         rng=np.random.RandomState(seed), config=_config("resume-x", seed, run_dirs))
     with pytest.raises(CheckpointCompatibilityError):
-        eng2.explain(np.ones(M) * 3, epsilon=EPS, delta=0.05, max_budget=200, resume=True)
+        eng2.explain(np.ones(M) * 0.5, epsilon=EPS, delta=0.05, max_budget=200, resume=True)

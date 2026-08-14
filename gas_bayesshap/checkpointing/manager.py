@@ -30,7 +30,10 @@ from ..utils.serialization import (
     write_json_atomic,
     write_npz_atomic,
 )
-from .compatibility import verify_compatibility
+from .compatibility import (
+    CheckpointIntegrityError,
+    verify_compatibility,
+)
 from .manifest import CheckpointManifest
 
 CHECKPOINT_STAGES = ("gp_stage", "residual_stage", "certification_stage", "final_stage")
@@ -93,9 +96,11 @@ class CheckpointManager:
         meta["_npz"] = npz_path.name
         write_json_atomic(json_path, meta, sort_keys=True)
 
-        # payload hash over the full state (arrays + meta)
+        # integrity records: payload hash over the full state + file checksums
         from .manifest import _jsonable_payload
         payload_hash = self.manifest.recompute_payload_hash(payload)
+        npz_sha = _file_sha256(npz_path)
+        json_sha = _file_sha256(json_path)
         self.manifest.update(
             checkpoint_name=name,
             stage=stage,
@@ -104,30 +109,81 @@ class CheckpointManager:
             config_hash=self.config_hash,
             oracle_hash=self.oracle_hash,
             payload_hash=payload_hash,
+            background_hash=self.background_hash,
+            engine_version=self.engine_version,
+            npz_sha256=npz_sha,
+            json_sha256=json_sha,
         )
         self._log("checkpoint_saved", checkpoint=name, stage=stage, iteration=int(iteration))
         return json_path
 
     # ------------------------------------------------------------------ #
     def load_latest(self) -> Dict[str, Any]:
-        """Load the latest valid checkpoint (raises if none exists)."""
+        """Load the latest valid checkpoint.
+
+        If the latest checkpoint fails integrity verification (corruption,
+        tampering, truncated-but-parseable arrays), the previous valid
+        checkpoint is loaded as a fallback; if that also fails the error is
+        re-raised.  Compatibility mismatches are *not* treated as corruption
+        (they are re-raised immediately).
+        """
         latest = self.manifest.latest()
         if latest is None:
             raise FileNotFoundError(f"no valid checkpoint for run {self.run_id}")
         name = latest["name"]
-        return self.load(name)
+        try:
+            return self.load(name)
+        except CheckpointIntegrityError as exc:
+            prev = self.manifest.data.get("previous_valid_checkpoint")
+            if prev:
+                self._log("checkpoint_fallback", status="INTEGRITY",
+                          failed=name, falling_back_to=prev, reason=str(exc)[:200])
+                return self.load(prev)
+            raise
 
     def load(self, name: str) -> Dict[str, Any]:
+        """Load a checkpoint with full integrity verification.
+
+        Raises
+        ------
+        CheckpointIntegrityError
+            If the stored payload hash or the NPZ/JSON file checksums do not
+            match the manifest record.
+        """
         json_path = self.directory / f"{name}.json"
         npz_name = load_json(json_path).get("_npz")
         if npz_name is None:
             raise FileNotFoundError(f"checkpoint {name} missing npz reference")
         npz_path = self.directory / npz_name
+
+        # 1. file-level integrity (checksums recorded at save time)
+        record = self.manifest.integrity_record(name)
+        if record is None:
+            raise CheckpointIntegrityError(f"no integrity record for checkpoint {name!r}")
+        if _file_sha256(npz_path) != record.get("npz"):
+            raise CheckpointIntegrityError(
+                f"checkpoint {name!r}: NPZ checksum mismatch (corrupted or tampered)"
+            )
+        if _file_sha256(json_path) != record.get("json"):
+            raise CheckpointIntegrityError(
+                f"checkpoint {name!r}: JSON checksum mismatch (corrupted or tampered)"
+            )
+
         npz = load_npz(npz_path)
         meta = load_json(json_path)
         state = dict(meta)
         for k in npz.files:
             state[k] = npz[k]
+
+        # 2. payload-level integrity (semantic hash over arrays + metadata)
+        state.pop("_npz", None)  # not part of the saved payload
+        loaded_hash = self.manifest.recompute_payload_hash(state)
+        if loaded_hash != record.get("payload"):
+            raise CheckpointIntegrityError(
+                f"checkpoint {name!r}: payload hash mismatch "
+                f"(loaded={loaded_hash[:12]}…, expected={record.get('payload', '')[:12]}…)"
+            )
+
         verify_compatibility(
             state,
             config_hash=self.config_hash,
@@ -168,3 +224,13 @@ class CheckpointManager:
 def _is_array(v: Any) -> bool:
     import numpy as np
     return isinstance(v, np.ndarray)
+
+
+def _file_sha256(path: os.PathLike) -> str:
+    """SHA-256 hex digest of a file's bytes."""
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()

@@ -37,7 +37,7 @@ def test_parity_values_and_queries(seed, M):
         return float(np.dot(x, w) + 0.3 * x[0] * x[1] if M > 1 else np.dot(x, w))
 
     x = np.ones(M)
-    r_ref, r_prod = _run_pair(model, bg, (-5.0, 5.0), x, seed,
+    r_ref, r_prod = _run_pair(model, bg, (-10.0, 10.0), x, seed,
                               epsilon=0.5, delta=0.05, max_budget=200,
                               n_pilot=3, n_active_steps=10)
 

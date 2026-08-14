@@ -53,3 +53,7 @@ def test_strict_mode_no_false_certification():
     widths = np.asarray(res["raw_confidence_widths"], dtype=np.float64)
     assert np.all(np.isinf(widths))           # missing strata are explicit (inf)
     assert res["uncertified_features"] == list(range(3))
+    # point estimates are flagged partial where cells are missing (audit
+    # Medium 2): unobserved cells are never silently presented as complete
+    assert not all(res["point_estimate_complete"])
+    assert res["missing_cells_by_feature"]  # at least one feature has gaps

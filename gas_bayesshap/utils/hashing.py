@@ -87,10 +87,21 @@ def config_hash(config: Mapping[str, Any]) -> str:
     return stable_hash(dict(config), namespace="config")
 
 
-def oracle_hash(model_tag: str, background: np.ndarray) -> str:
-    """Hash identifying a coalition oracle: model tag + frozen background."""
+def oracle_hash(
+    model_tag: str,
+    background: np.ndarray,
+    artifact_hash: Optional[str] = None,
+) -> str:
+    """Hash identifying a coalition oracle: model tag + optional artifact
+    hash + frozen background.
+
+    ``artifact_hash`` is a caller-supplied digest of the model artifact
+    (e.g. ``sha256`` of fitted parameters / ``state_dict`` / model file).
+    When it is provided, the identity includes it — two models that differ
+    only by parameters are then never cache/checkpoint-compatible.
+    """
     return stable_hash(
-        {"model_tag": model_tag, "background": np.asarray(background)},
+        {"model_tag": model_tag, "artifact": artifact_hash, "background": np.asarray(background)},
         namespace="oracle",
     )
 

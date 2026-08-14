@@ -44,7 +44,7 @@ def test_coalition_eval_cost_rules():
 
 def test_explain_reports_per_call_deltas():
     eng = GASBayesSHAP(lambda x: float(np.sum(x)), np.zeros((3, 3)),
-                       output_bounds=(0.0, 3.0),
+                       output_bounds=(0.0, 8.0),
                        rng=np.random.RandomState(0), config=ENGINE_CONFIG)
     r1 = eng.explain(np.ones(3), epsilon=1.0, delta=0.05, max_budget=40)
     r2 = eng.explain(np.ones(3) * 2, epsilon=1.0, delta=0.05, max_budget=40)
@@ -59,7 +59,7 @@ def test_explain_reports_per_call_deltas():
 def test_stage2_budget_never_exceeded():
     M = 4
     eng = GASBayesSHAP(lambda x: float(np.dot(x, [1.0, -1.0, 0.5, 2.0])),
-                       np.zeros((4, M)), output_bounds=(-3.0, 3.0),
+                       np.zeros((4, M)), output_bounds=(-4.0, 4.0),
                        rng=np.random.RandomState(1), config=ENGINE_CONFIG)
     budget = 25
     res = eng.explain(np.ones(M), epsilon=0.001, delta=0.05, max_budget=budget)

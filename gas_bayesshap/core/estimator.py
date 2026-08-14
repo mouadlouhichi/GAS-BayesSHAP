@@ -656,7 +656,12 @@ class GASBayesSHAP:
         checkpoint_every = max(1, int(cfg.get("checkpoint_every", 1)))
 
         raw_widths = np.full(M, np.inf)
-        stage2_evals_start = self.oracle.total_coalition_evals
+        # Cumulative Stage-2 attempted-evaluation counter (across resume):
+        # `max_budget` is a *run-level* allowance, so a resumed run deducts the
+        # Stage-2 work completed before the checkpoint instead of restarting
+        # with a fresh budget (audit finding: High 1).
+        if not hasattr(self, "_stage2_attempted_total"):
+            self._stage2_attempted_total = 0
         iter_count = int(start_iter)
         converged = False
         budget_exhausted = False
@@ -682,20 +687,18 @@ class GASBayesSHAP:
             # `max_budget` bounds the individual coalition evaluations of the
             # Stage-2 adaptive loop (spec section 32).  Each round would cost
             # `1 + M` coalition evaluations (base subset + one marginal per
-            # player).  When the coalition cache is enabled, repeated draws
-            # are cache hits (0 true evals), so the guard accounts *attempted*
-            # evaluations — identical round accounting to the no-cache
-            # reference, and the loop always terminates.
+            # player).  The counter is *cumulative across resume*, so a resumed
+            # run respects the same total allowance as an uninterrupted one.
+            # When the coalition cache is enabled, repeated draws are cache
+            # hits (0 true evals), so we account *attempted* evaluations —
+            # identical round accounting to the no-cache reference, and the
+            # loop always terminates.
             round_cost_upper = 1 + M
-            if self._cache is not None:
-                current_stage2_evals = (iter_count - start_iter) * round_cost_upper
-            else:
-                current_stage2_evals = self.oracle.total_coalition_evals - stage2_evals_start
-            if current_stage2_evals + round_cost_upper > max_budget:
+            if self._stage2_attempted_total + round_cost_upper > max_budget:
                 budget_exhausted = True
                 self._log_event(STAGE_ADAPTIVE, "budget_exhausted", "BUDGET_EXHAUSTED",
                                 topic="certification",
-                                current_stage2_evals=current_stage2_evals,
+                                current_stage2_evals=self._stage2_attempted_total,
                                 round_cost_upper=round_cost_upper, max_budget=max_budget)
                 # leave a residual checkpoint so resume continues the adaptive loop
                 self._checkpoint_residual(store, sigma_res, neyman, iteration=iter_count, widths=raw_widths)
@@ -771,6 +774,7 @@ class GASBayesSHAP:
                             n_records=store.n_records)
 
             iter_count += 1
+            self._stage2_attempted_total += round_cost_upper
             self.state.iteration = iter_count
             if checkpoint and self._checkpoint_manager is not None and iter_count % checkpoint_every == 0:
                 # checkpoint records state AFTER round iter_count-1, labelled with
@@ -865,6 +869,12 @@ class GASBayesSHAP:
                 "samples detected (check model_fn determinism and output_bounds)"
             )
 
+        # stratum-coverage completeness: a feature with missing cells has a
+        # *partial* point estimate (unobserved cells contribute 0 to phi_res)
+        # and must be flagged explicitly (audit finding: Medium 2).
+        from ..residual.estimator import stratum_completeness
+        point_complete, missing_cells = stratum_completeness(store, M)
+
         all_finite = bool(np.all(np.isfinite(widths)))
         call_coal = self.oracle.total_coalition_evals - evals_start_coal
         call_model = self.oracle.total_model_evals - evals_start_model
@@ -909,6 +919,20 @@ class GASBayesSHAP:
             status_detail=status_detail,
             converged_early=bool(converged),
             extra={
+                # --- per-call vs full-run query accounting (audit Medium 3) ---
+                "num_coalition_evals_this_call": int(call_coal),
+                "num_coalition_evals_run_total": int(self.oracle.total_coalition_evals),
+                "num_model_evals_this_call": int(call_model),
+                "num_model_evals_run_total": int(self.oracle.total_model_evals),
+                # --- baseline model cost (audit Medium 4) ---
+                "baseline_model_evals": int(self.B),
+                "num_model_evals_end_to_end": int(self.oracle.total_model_evals),
+                # --- point-estimate completeness (audit Medium 2) ---
+                "point_estimate_complete": [bool(v) for v in point_complete],
+                "missing_cells_by_feature": {
+                    str(i): miss for i, miss in missing_cells.items()
+                },
+                "stage2_attempted_total": int(getattr(self, "_stage2_attempted_total", 0)),
                 "epsilon": float(epsilon),
                 "delta": float(delta),
                 "max_width": float(np.max(widths)) if widths.size else float("inf"),
@@ -1032,6 +1056,7 @@ class GASBayesSHAP:
             {
                 "stage": "residual_stage",
                 "iteration": int(iteration),
+                "stage2_attempted_total": int(getattr(self, "_stage2_attempted_total", 0)),
                 "store": store.to_dict(),
                 "sigma_res": sigma_res,
                 "neyman_probs": neyman.probabilities,
@@ -1055,6 +1080,7 @@ class GASBayesSHAP:
             {
                 "stage": "certification_stage",
                 "iteration": int(self.state.iteration),
+                "stage2_attempted_total": int(getattr(self, "_stage2_attempted_total", 0)),
                 "converged": bool(converged),
                 "store": store.to_dict(),
                 "sigma_res": sigma_res,
@@ -1074,6 +1100,7 @@ class GASBayesSHAP:
             {
                 "stage": "final_stage",
                 "iteration": int(self.state.iteration),
+                "stage2_attempted_total": int(getattr(self, "_stage2_attempted_total", 0)),
                 "results": results.to_dict(include_arrays=True),
                 "store": (self._residual_store.to_dict() if self._residual_store is not None else None),
                 "widths": results.raw_confidence_widths,
@@ -1104,6 +1131,7 @@ class GASBayesSHAP:
         self.oracle.total_coalition_evals = int(ckpt.get("num_coalition_evals", self.oracle.total_coalition_evals))
         self.oracle.total_model_evals = int(ckpt.get("num_model_evals", self.oracle.total_model_evals))
         self._gp_predictions_counter = [1] * int(ckpt.get("num_gp_predictions", 0))
+        self._stage2_attempted_total = int(ckpt.get("stage2_attempted_total", 0))
         if ckpt.get("rng_state"):
             dict_to_rng_state(self.rng, ckpt["rng_state"])
 

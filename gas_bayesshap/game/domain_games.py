@@ -268,7 +268,9 @@ class SilhouetteOracle(CoalitionOracle):
             n_clusters=self.n_clusters, random_state=self._random_state, n_init=10
         )
         labels = km.fit_predict(X_S)
-        if len(np.unique(labels)) < 2:
+        n_labels = len(np.unique(labels))
+        # silhouette_score requires 2 <= n_labels <= n_samples - 1
+        if n_labels < 2 or n_labels >= len(X_S):
             return 0.0
         val = float(silhouette_score(X_S, labels))
         self._last_model_evals = 1
