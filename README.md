@@ -92,7 +92,7 @@ jupyter nbconvert --to notebook --execute notebooks/run_all.ipynb
 ## Tests
 
 ```bash
-python -m pytest tests/ -q          # 173 tests across 6 suites
+python -m pytest tests/ -q          # 185 tests across 6 suites
 ```
 
 | Suite | Coverage |

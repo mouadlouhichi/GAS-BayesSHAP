@@ -371,6 +371,13 @@ class GASBayesSHAP:
 
         # --- STAGE 1 (skipped on resume: surrogate restored from checkpoint) - #
         if resumed_state is None:
+            # A fresh, non-resumed invocation starts with a zero cumulative
+            # Stage-2 budget.  Resumed runs keep the counter restored from the
+            # checkpoint (see _resume_checkpoint), so `max_budget` stays a
+            # run-level allowance.  Without this reset, reusing the same engine
+            # for independent explain() calls would inherit the previous call's
+            # Stage-2 budget (audit caveat 5.1).
+            self._stage2_attempted_total = 0
             self._stage1_active_gp(x, n_act, checkpoint=checkpoint)
 
         # --- STAGE 2 ----------------------------------------------------- #
