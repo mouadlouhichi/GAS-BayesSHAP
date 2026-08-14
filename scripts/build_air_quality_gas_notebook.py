@@ -172,10 +172,17 @@ def load_air():
 
     if not os.path.exists(zip_path):
         print("Downloading Beijing multi-site air-quality dataset ...")
-        mirrors = [
-            # 1) Kaggle-signed GCS mirror of the same UCI dataset (PRSA_Data_* station
-            #    CSVs, 12 sites).  NOTE: this signed URL EXPIRES (~3 days from issue);
-            #    if it 404s, the loader falls through to the official UCI mirrors.
+        # CSV mirrors (single combined table) are tried first; ZIP mirrors
+        # (per-station archives) are extracted and combined.  Each is validated
+        # to contain the 11 air-quality features before being accepted.
+        csv_mirrors = [
+            # 1) stable GitHub mirror of the UCI dataset (combined data.csv)
+            "https://raw.githubusercontent.com/Afkerian/Beijing-Multi-Site-Air-Quality-Data-Data-Set/main/data/beijing%2Bmulti%2Bsite%2Bair%2Bquality%2Bdata/data.csv",
+        ]
+        zip_mirrors = [
+            # 2) Kaggle-signed GCS mirror (PRSA_Data_* station CSVs, 12 sites).
+            #    NOTE: this signed URL EXPIRES (~3 days from issue); if it 404s
+            #    the loader falls through to the official UCI mirrors.
             "https://storage.googleapis.com/kaggle-data-sets/409180/783762/bundle/archive.zip"
             "?X-Goog-Algorithm=GOOG4-RSA-SHA256"
             "&X-Goog-Credential=gcp-kaggle-com%40kaggle-161607.iam.gserviceaccount.com%2F20260814%2Fauto%2Fstorage%2Fgoog4_request"
@@ -183,37 +190,45 @@ def load_air():
             "&X-Goog-Expires=259200"
             "&X-Goog-SignedHeaders=host"
             "&X-Goog-Signature=4e88c0c92fe6c7bccc6d20988e45443705be421025b41ef54866c8bd31358c1a93babbcd41d78e0e5577e77d78a1660e1f180ad4da76849cf8467874e711e9377a09d09d9280803587466528ee25587e14752da8f74def2d2cb860d0a630455d5e20b6bc47ea49c4ee152fff3ba5b5ded44f9b1b685928d2ec2e81763b637dbf33ccff081ff3d2f43af2fec4bc000a3c97e0f4d49ba9f3b4e039ad5f1eb5974ba26ce07b81619f2866b7d035cc0de2e025fe509317bb886ca35f1d9cf65a2f7919dd7df6ea2d83294103f35e4cb2355156c13991fc5bf66169bd674e3633044b502214bce941478ea0b853cab4bf9eb558a6d4ccd94b9e82e9634e616d8261b3",
-            # 2) official UCI locations (may redirect to a wrong archive)
+            # 3) official UCI locations (may redirect to a wrong archive)
             "https://archive.ics.uci.edu/static/public/501/beijing+multi-site+air-quality+data.zip",
             "https://archive.ics.uci.edu/ml/machine-learning-databases/00501/Beijing_MultiSite_AirQuality.zip",
         ]
         ok = False
-        for u in mirrors:
-            tmp_zip = zip_path + ".tmp"
-            if _download(u, tmp_zip):
-                if u.endswith(".csv"):
-                    try:
-                        probe = pd.read_csv(tmp_zip)
-                        if set(FEATURES).issubset(probe.columns):
-                            os.replace(tmp_zip, zip_path)  # keep as cache
-                            ok = True
-                            break
-                    except Exception:
-                        pass
-                    if os.path.exists(tmp_zip):
-                        os.remove(tmp_zip)
-                elif _zip_is_valid(tmp_zip):
-                    os.replace(tmp_zip, zip_path)
-                    ok = True
-                    break
-                else:
-                    print("  mirror returned an INVALID archive (wrong content) - skipping")
-                    if os.path.exists(tmp_zip):
-                        os.remove(tmp_zip)
+        for u in csv_mirrors:
+            tmp = combined + ".tmp"
+            if _download(u, tmp):
+                try:
+                    probe = pd.read_csv(tmp)
+                    if set(FEATURES).issubset(probe.columns):
+                        os.replace(tmp, combined)  # cache the combined CSV
+                        ok = True
+                        break
+                except Exception:
+                    pass
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+                print("  CSV mirror invalid (wrong content) - skipping")
+        if not ok:
+            for u in zip_mirrors:
+                tmp = zip_path + ".tmp"
+                if _download(u, tmp):
+                    if _zip_is_valid(tmp):
+                        os.replace(tmp, zip_path)
+                        ok = True
+                        break
+                    print("  ZIP mirror returned an INVALID archive (wrong content) - skipping")
+                    if os.path.exists(tmp):
+                        os.remove(tmp)
         if not ok:
             print("All downloads failed or were invalid -> using SYNTHETIC regime-structured fallback (offline sandbox).")
             DATA_SOURCE = "synthetic-fallback"
             return _synthetic_air()
+
+    # a CSV mirror caches directly into the combined CSV -> return it now
+    if os.path.exists(combined):
+        DATA_SOURCE = "url-csv (cached to " + combined + ")"
+        return pd.read_csv(combined)
 
     # 3) extract + combine ALL station CSVs (multi-site), then sort by station/time
     with zipfile.ZipFile(zip_path) as z:
