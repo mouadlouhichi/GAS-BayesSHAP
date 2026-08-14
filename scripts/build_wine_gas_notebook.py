@@ -255,12 +255,18 @@ tree_phi = sv_tree[0]   # first test instance (class extractor applied in cell 8
 def proba_matrix(Xmat):
     return lgb_model.predict_proba(np.asarray(Xmat))[:, cluster_id]
 
-kexplainer = shap.KernelExplainer(proba_matrix, background[:32])
+kexplainer = shap.KernelExplainer(proba_matrix, background)
+  # matched background
 kernel_phi = kexplainer.shap_values(x0, nsamples=128)
 
 # --- SamplingSHAP (Monte-Carlo baseline on the probability game) ---
 mc = monte_carlo_shapley(oracle, x0, n_samples=150, rng=np.random.RandomState(0))
 mc_phi = np.asarray(mc["shapley_values"])
+
+# The theorem guarantees SIMULTANEOUS coverage: P(forall i, |phi_i - phi_i| <= W_i) >= 1 - delta.
+err_gas = np.abs(phi_gas - phi_exact)
+gas_simultaneous = float(np.all(err_gas <= W_proj))
+gas_marginal = float(np.mean(err_gas <= W_proj))
 
 rows = {
     "GAS-BayesSHAP (certified)": dict(
@@ -268,26 +274,37 @@ rows = {
         max_err=max_abs_error(phi_gas, phi_exact),
         coalition_evals=result["num_coalition_evals_this_call"],
         model_evals=result["num_model_evals_this_call"],
-        coverage=float(np.mean(np.abs(phi_gas - phi_exact) <= W_proj))),
-    "TreeSHAP (logit)": dict(
-        rmse=rmse(tree_phi, phi_exact), mae=mae(tree_phi, phi_exact),
-        max_err=max_abs_error(tree_phi, phi_exact), coalition_evals="-", model_evals="-", coverage="-"),
+        simultaneous_coverage=gas_simultaneous, marginal_coverage=gas_marginal),
     "KernelSHAP": dict(
         rmse=rmse(kernel_phi, phi_exact), mae=mae(kernel_phi, phi_exact),
         max_err=max_abs_error(kernel_phi, phi_exact),
-        coalition_evals=128, model_evals=128 * B, coverage="-"),
+        coalition_evals=128, model_evals=128 * B,
+        simultaneous_coverage="-", marginal_coverage="-"),
     "SamplingSHAP (MC)": dict(
         rmse=rmse(mc_phi, phi_exact), mae=mae(mc_phi, phi_exact),
         max_err=max_abs_error(mc_phi, phi_exact),
-        coalition_evals=mc["num_coalition_evals"], model_evals=mc["num_model_evals"], coverage="-"),
+        coalition_evals=mc["num_coalition_evals"], model_evals=mc["num_model_evals"],
+        simultaneous_coverage="-", marginal_coverage="-"),
     "Exact (ground truth)": dict(
         rmse=0.0, mae=0.0, max_err=0.0,
-        coalition_evals=2 ** M, model_evals=oracle.total_model_evals, coverage="1.0"),
+        coalition_evals=2 ** M, model_evals=oracle.total_model_evals,
+        simultaneous_coverage="1.0", marginal_coverage="1.0"),
 }
 df_cmp = pd.DataFrame(rows).T
+print("DATA_SOURCE:", DATA_SOURCE)
 print(df_cmp.round(5))
-print("\\nCoverage (GAS certified):", df_cmp.loc["GAS-BayesSHAP (certified)", "coverage"])"""))
+print("GAS simultaneous coverage (all features in interval):", gas_simultaneous)
+print("GAS marginal coverage (per-feature):", round(gas_marginal, 4))
 
+# --- TreeSHAP is logit-space: NOT a same-game estimator, shown separately ---
+print("TreeSHAP (logit space, model-specific baseline, NOT same-game):")
+print(pd.Series(tree_imp, index=feature_names).sort_values(ascending=False).round(4))
+
+import os as _os
+_out = os.path.join("..", "results", "wine_tierA")
+os.makedirs(_out, exist_ok=True)
+df_cmp.to_csv(os.path.join(_out, "comparison.csv"))
+print("saved results/wine_tierA/comparison.csv")"""))
 A(md("## 12. Certified waterfall plot with error bars"))
 A(cell("""certified = np.abs(phi_gas) > W_proj
 order = np.argsort(-np.abs(phi_gas))
