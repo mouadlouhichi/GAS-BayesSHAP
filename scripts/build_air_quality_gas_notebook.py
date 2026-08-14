@@ -283,9 +283,16 @@ def load_air():
             return _synthetic_air()
 
     # a CSV mirror caches directly into the combined CSV -> return it now
+    # (VALIDATED: never return a stale wrong file)
     if os.path.exists(combined):
-        DATA_SOURCE = "url-csv (cached to " + combined + ")"
-        return pd.read_csv(combined)
+        cand = pd.read_csv(combined)
+        if _valid(cand):
+            DATA_SOURCE = "url-csv (cached to " + combined + ")"
+            return cand
+        print("post-download combined CSV is INVALID -> quarantining and falling back")
+        _quarantine(combined)
+        DATA_SOURCE = "synthetic-fallback"
+        return _synthetic_air()
 
     # 3) extract + combine ALL station CSVs (multi-site), then sort by station/time
     with zipfile.ZipFile(zip_path) as z:
@@ -322,11 +329,18 @@ def load_air():
     return df
 
 
+LOADER_VERSION = 4
+print("air loader version:", LOADER_VERSION)
 df = load_air()
 print("Dataset shape:", df.shape, "| source:", DATA_SOURCE)
 if not set(FEATURES).issubset(df.columns):
     print("Available columns:", list(df.columns)[:20])
-    raise ValueError("expected the 11 air-quality features (PM2.5..WSPM); got " + str(list(df.columns)[:20]))
+    print("ERROR: the air-quality features are missing from the loaded data.")
+    print("Fix: delete any stale files in ../data/ and rerun:")
+    print("    rm -f ../data/Beijing_MultiSite_AirQuality.csv* ../data/Beijing_MultiSite_AirQuality.zip*")
+    print("    python scripts/build_air_quality_gas_notebook.py   # rebuild the notebook")
+    raise ValueError("air-quality loader returned a non-air-quality dataset (see message above); "
+                     "delete stale ../data/ files and rebuild the notebook")
 
 X_full = df[FEATURES].copy()
 # keep one station for a clean hourly series if the multi-site file was loaded
