@@ -82,3 +82,32 @@ def test_spec_compliance_json_is_evidence_based():
     math2 = [i for i in audit["items"] if i["id"] == "MATH_2"][0]
     assert math2["status"] == VALIDATED
     assert math2["evidence"]
+
+
+def test_compliance_from_pytest_artifacts():
+    """compliance_from_pytest() records real test counts in the audit
+    evidence (audit: compliance must consume actual test artifacts)."""
+    from gas_bayesshap.core.compliance import compliance_from_pytest
+    eng = _run_engine()
+    audit = compliance_from_pytest(eng, passed=173, failed=0, commit="abc123")
+    assert audit["evidence"]["pytest"] == {"passed": 173, "failed": 0}
+    assert audit["evidence"]["commit"] == "abc123"
+    assert "pytest tests/mathematical passed (173 tests" in audit["evidence"]["math_validated"]
+    assert audit["overall"] == "COMPLIANT"
+
+
+def test_write_results_with_pytest_evidence(tmp_path):
+    """write_results(pytest_evidence=...) embeds the test artifact into the
+    compliance file."""
+    import json
+    from pathlib import Path
+    rng = np.random.RandomState(0)
+    M = 3
+    eng = GASBayesSHAP(lambda x: float(np.sum(x)), np.zeros((2, M)),
+                       output_bounds=(0.0, 3.0), rng=np.random.RandomState(0),
+                       config={**ENGINE_CONFIG, "results_dir": str(tmp_path / "res")})
+    eng.explain(np.ones(M), epsilon=1.0, max_budget=40)
+    run_dir = eng.write_results(pytest_evidence={"passed": 173, "failed": 0})
+    audit = json.loads((Path(run_dir) / "spec_compliance.json").read_text())
+    assert audit["evidence"]["pytest"]["passed"] == 173
+    assert audit["evidence"]["pytest"]["failed"] == 0

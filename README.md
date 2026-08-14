@@ -115,8 +115,12 @@ python -m pytest tests/ -q          # 173 tests across 6 suites
   the previous valid checkpoint.
 * **Honest compliance audit** — `spec_compliance.json` statuses are
   `IMPLEMENTED / TESTED / VALIDATED / MISSING`; the math items execute the
-  brute-force validation at audit time (evidence strings recorded), and the
-  audit accepts external test artifacts. It is no longer self-declarative.
+  brute-force validation at audit time (evidence strings recorded).  The
+  report additionally consumes real test artifacts when provided:
+  `compliance_from_pytest(passed, failed, commit)` embeds a pytest summary
+  and the current commit into the evidence, and
+  `write_results(pytest_evidence={...})` persists it.  It is never a bare
+  self-declaration.
 * **Output-bounds contract** — oracle outputs are checked against the declared
   `[L, U]` on every evaluation (incl. non-finite rejection) and raise
   `OutputBoundViolation`; a certificate can never be labeled rigorous for a

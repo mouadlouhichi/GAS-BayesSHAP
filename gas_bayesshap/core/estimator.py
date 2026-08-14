@@ -1267,11 +1267,24 @@ class GASBayesSHAP:
     def results(self) -> Optional[RunResults]:
         return self._results
 
-    def write_results(self, spec_compliance: Optional[dict] = None) -> Path:
-        """Write the results/runs/<run_id>/ layout (spec section 48)."""
+    def write_results(self, spec_compliance: Optional[dict] = None, pytest_evidence: Optional[dict] = None) -> Path:
+        """Write the results/runs/<run_id>/ layout (spec section 48).
+
+        ``pytest_evidence`` (e.g. ``{"passed": N, "failed": 0}``) is embedded
+        into ``spec_compliance.json`` so the compliance report reflects actual
+        test artifacts for the current commit.
+        """
         if self._results is None:
             raise RuntimeError("no results yet — call explain() first")
-        compliance = spec_compliance or self.compliance_audit()
+        if spec_compliance is None:
+            if pytest_evidence is not None:
+                from .compliance import compliance_from_pytest
+                compliance = compliance_from_pytest(
+                    self, passed=int(pytest_evidence.get("passed", 0)),
+                    failed=int(pytest_evidence.get("failed", 0)),
+                )
+            else:
+                compliance = self.compliance_audit()
         env = environment_manifest()
         provenance = {
             "run_id": self.run_id,

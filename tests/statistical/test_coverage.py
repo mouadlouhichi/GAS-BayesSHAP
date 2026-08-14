@@ -20,7 +20,8 @@ def _model_cal(x):
 
 
 def test_coverage_calibration_30_trials():
-    """The supplied 30-trial regression test (coverage-given-finite >= 90%)."""
+    """The supplied 30-trial regression test (coverage-given-finite >= 90%),
+    reporting the binomial confidence interval on the empirical coverage."""
     R = 30
     finite_count = 0
     covered_count = 0
@@ -37,6 +38,34 @@ def test_coverage_calibration_30_trials():
     cov_given_finite = covered_count / max(1, finite_count)
     assert finite_count > 0
     assert cov_given_finite >= 0.90
+    # report a 95% binomial CI on the empirical coverage (Wilson interval)
+    if finite_count:
+        z = 1.96
+        p = cov_given_finite
+        n = finite_count
+        denom = 1 + z * z / n
+        centre = (p + z * z / (2 * n)) / denom
+        half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+        print(f"  coverage {p:.3f} ({centre - half:.3f}, {centre + half:.3f}) 95% CI, n={n}")
+
+
+def test_coverage_calibration_100_trials():
+    """Larger configurable run for a tighter coverage estimate (audit: R=30 is
+    weak for a 95% claim).  With wide-enough budgets the certified intervals
+    must contain the exact ground truth on this deterministic calibration game
+    in every trial."""
+    R = 100
+    finite = covered = 0
+    for trial in range(R):
+        e = GASBayesSHAP(_model_cal, np.zeros((3, 3)), output_bounds=(-2.0, 5.0),
+                         rng=np.random.RandomState(1000 + trial), config=ENGINE_CONFIG)
+        r = e.explain(np.ones(3), epsilon=1.5, delta=0.05, max_budget=300)
+        if np.all(np.isfinite(r["certified_projected_widths"])):
+            finite += 1
+            if np.all(np.abs(r["shapley_values"] - PHI_EXACT) <= r["certified_projected_widths"]):
+                covered += 1
+    assert finite == R  # 100% finite-width rate on this game/budget
+    assert covered / max(1, finite) >= 0.90
 
 
 def test_coverage_report_configurable_trials():
