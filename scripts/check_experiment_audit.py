@@ -60,6 +60,13 @@ def main() -> int:
          '"TreeSHAP (logit)"' not in wine and "rmse(tree_phi" not in wine),
         ("wine: TreeSHAP reported separately as space-mismatch",
          "TreeSHAP (logit space, model-specific baseline, NOT same-game)" in wine),
+        # --- data loading (Beijing per-station CSVs) ---
+        ("air: scans data/ directly for PRSA_Data_*.csv",
+         'fn.lower().startswith("prsa_data_")' in air
+         and "scan_dirs = [DATA_DIR," in air),
+        ("air: merges per-station CSVs with station column",
+         'tmp["station"] = os.path.splitext(fn)[0]' in air
+         and 'DATA_SOURCE = f"dir-merge:{subdir}' in air),
     ]
 
     failed = 0

@@ -177,30 +177,34 @@ def load_air():
             print("cached combined CSV unreadable:", type(exc).__name__, "- quarantining")
             _quarantine(combined)
 
-    # 1b) directory of per-station CSVs (e.g. PRSA_Data_*.csv extracted from the
-    #     Kaggle/UCI archive into data/beijing/).  Merged like the standard
-    #     multi-file recipe, with a station column and air-quality validation.
-    for sub in ("beijing", "PRSA_Data_20130301-20170228"):
-        subdir = os.path.join(DATA_DIR, sub)
-        if os.path.isdir(subdir):
-            frames = []
-            for fn in sorted(os.listdir(subdir)):
-                if fn.lower().endswith(".csv"):
-                    tmp = pd.read_csv(os.path.join(subdir, fn))
-                    if not set(FEATURES).intersection(tmp.columns):
-                        print(f"  skipping {fn} (not an air-quality file)")
-                        continue
-                    if "station" not in tmp.columns:
-                        tmp["station"] = os.path.splitext(fn)[0]
-                    frames.append(tmp)
-            if frames:
-                df = pd.concat(frames, ignore_index=True)
-                if _valid(df):
-                    df.to_csv(combined, index=False)
-                    DATA_SOURCE = f"dir-merge:{subdir} (cached to {combined})"
-                    return df
-                print(f"WARNING: merged CSVs in {subdir} lack the air-quality features "
-                      f"({list(df.columns)[:6]}...) -> quarantining combined")
+    # 1b) per-station PRSA_Data_*.csv files (the UCI/Kaggle archive contents),
+    #     either directly in data/ (default) or in data/beijing/ or
+    #     data/PRSA_Data_20130301-20170228/ subfolders.  Merged like the
+    #     standard multi-file recipe with air-quality validation.
+    scan_dirs = [DATA_DIR,
+                 os.path.join(DATA_DIR, "beijing"),
+                 os.path.join(DATA_DIR, "PRSA_Data_20130301-20170228")]
+    for subdir in scan_dirs:
+        if not os.path.isdir(subdir):
+            continue
+        frames = []
+        for fn in sorted(os.listdir(subdir)):
+            if fn.lower().startswith("prsa_data_") and fn.lower().endswith(".csv"):
+                tmp = pd.read_csv(os.path.join(subdir, fn))
+                if not set(FEATURES).intersection(tmp.columns):
+                    print(f"  skipping {fn} (not an air-quality file)")
+                    continue
+                if "station" not in tmp.columns:
+                    tmp["station"] = os.path.splitext(fn)[0]
+                frames.append(tmp)
+        if frames:
+            df = pd.concat(frames, ignore_index=True)
+            if _valid(df):
+                df.to_csv(combined, index=False)
+                DATA_SOURCE = f"dir-merge:{subdir} (cached to {combined})"
+                return df
+            print(f"WARNING: merged CSVs in {subdir} lack the air-quality features "
+                  f"({list(df.columns)[:6]}...) -> quarantining combined")
 
     # 2) cached ZIP -- validated; a wrong archive is quarantined and re-downloaded
     def _zip_is_valid(zpath):
