@@ -87,6 +87,10 @@ python scripts/run_all.py --M 5
 
 # notebook (17 sections + status dashboard)
 jupyter nbconvert --to notebook --execute notebooks/run_all.ipynb
+
+# Tier-A wine experiment: exact Shapley (2^11) + certified GAS-BayesSHAP
+# attributions vs TreeSHAP / KernelSHAP / SamplingSHAP
+jupyter nbconvert --to notebook --execute notebooks/SHAP_WINE_GAS.ipynb
 ```
 
 ## Tests
@@ -156,7 +160,10 @@ gas_bayesshap/    package: core, game, kernels, gp, residual, certification,
                   benchmarking, utils, reference (spec parity oracle)
 scripts/          validate_math, run_exact, run_bayesshap, benchmark, run_all
 tests/            mathematical, numerical, statistical, protocol, integration, resume
-notebooks/        run_all.ipynb (executed)
+notebooks/        run_all.ipynb (engine demo, executed)
+                  SHAP_WINE_CODE.ipynb (previous-work wine baseline, executed)
+                  SHAP_WINE_GAS.ipynb (Tier-A wine exact ground-truth +
+                  certified GAS-BayesSHAP comparison, executed)
 specs/            authoritative v11.0 specs + analysis
 ```
 
