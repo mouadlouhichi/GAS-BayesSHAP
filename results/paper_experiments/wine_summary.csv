@@ -1,0 +1,2 @@
+dataset,n_instances,clusters,eps,budget,rmse_gas_mean,rmse_gas_std,rmse_kernel_mean,rmse_mc_mean,simultaneous_coverage_rate,marginal_coverage_rate,sign_certified_fraction,mean_width,max_width_max,gas_evals_mean,exact_evals,kernel_evals,mc_evals_mean,converged_fraction,status_counts
+wine,6,2,0.05,1500,0.0016981456271560225,0.0007561265566016418,0.003951187408599491,0.053123418878207374,1.0,1.0,0.0,16.941047173966112,23.811290162527886,1029.3333333333333,2048,256,834.3333333333334,0.0,{'BUDGET_EXHAUSTED': 6}
