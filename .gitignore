@@ -33,3 +33,5 @@ results/air_quality_tierA/
 results/air_quality_tierB/
 
 *.zip
+# altair temp json exports from notebooks
+notebooks/altair-data-*.json
