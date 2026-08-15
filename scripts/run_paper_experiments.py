@@ -425,7 +425,8 @@ def main():
         run_widths("air", Xa, FEATURES, n_clusters=4,
                    budgets=[500, 1000, 2000, 4000, 8000], N=5, eps=args.eps)
     if args.only in ("tierb", "all"):
-        run_tier_b(eps=args.eps, budget=args.budget, N=min(args.n, 10))
+        # N is user-controlled (--n); previously capped at 10 instances.
+        run_tier_b(eps=args.eps, budget=args.budget, N=args.n)
 
     # copy to main_results with prefixes
     MAIN.mkdir(parents=True, exist_ok=True)
