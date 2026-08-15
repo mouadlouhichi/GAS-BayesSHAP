@@ -202,8 +202,6 @@ def run_dataset(name, X, feat_names, n_clusters, eps, budget, N):
             print(f"  {i+1}/{N} instances done")
 
     df = pd.DataFrame(rows)
-    # incremental write (so partial runs persist)
-    df.to_csv(out(f"{name}_instances.csv"), index=False)
     summary = {
         "dataset": name, "n_instances": len(df), "clusters": n_clusters,
         "eps": eps, "budget": budget,
@@ -219,8 +217,8 @@ def run_dataset(name, X, feat_names, n_clusters, eps, budget, N):
         "converged_fraction": df["converged"].mean(),
         "status_counts": df["status"].value_counts().to_dict(),
     }
-    df.to_csv(out(f"{name}_instances.csv"), index=False)
-    pd.DataFrame([summary]).to_csv(out(f"{name}_summary.csv"), index=False)
+    df.to_csv(out(f"{name}_n{len(df)}_budget{budget}_instances.csv"), index=False)
+    pd.DataFrame([summary]).to_csv(out(f"{name}_n{len(df)}_budget{budget}_summary.csv"), index=False)
     print(f"[{name}] summary: {json.dumps(summary, indent=2, default=str)}")
     return df, summary
 
