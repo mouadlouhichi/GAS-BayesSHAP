@@ -43,9 +43,11 @@ NOTEBOOKS = {
 }
 
 # notebook -> (artifact dirs whose comparison.csv / *.png get copied to main_results)
+# Each notebook's artifacts get a DISTINCT prefix so they never overwrite each
+# other (e.g. wine comparison.csv vs air comparison.csv).
 ARTIFACT_DIRS = {
-    "notebooks/SHAP_WINE_GAS.ipynb": ["results/wine_tierA"],
-    "notebooks/AIR_QUALITY_GAS.ipynb": ["results/air_quality_tierA", "results/air_quality_tierB"],
+    "notebooks/SHAP_WINE_GAS.ipynb": ("wine", ["results/wine_tierA"]),
+    "notebooks/AIR_QUALITY_GAS.ipynb": ("air", ["results/air_quality_tierA", "results/air_quality_tierB"]),
 }
 
 
@@ -56,14 +58,19 @@ def collect_artifacts(nb_rel: str) -> None:
     # 1) the executed notebook itself
     shutil.copy2(ROOT / nb_rel, main_results / Path(nb_rel).name)
     # 2) generated comparison tables / figures
-    for d in ARTIFACT_DIRS.get(nb_rel, []):
+    entry = ARTIFACT_DIRS.get(nb_rel)
+    if not entry:
+        return
+    prefix, dirs = entry
+    for d in dirs:
         src_dir = ROOT / d
         if not src_dir.is_dir():
             continue
         for f in sorted(src_dir.iterdir()):
             if f.suffix.lower() in (".csv", ".png", ".jpg", ".json"):
-                shutil.copy2(f, main_results / f.name)
-                print(f"  [collect] {f.name} -> main_results/")
+                dest = main_results / f"{prefix}_{f.name}"
+                shutil.copy2(f, dest)
+                print(f"  [collect] {f.name} -> main_results/{prefix}_{f.name}")
 
 
 def main() -> int:
