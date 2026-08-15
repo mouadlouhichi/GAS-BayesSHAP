@@ -332,6 +332,10 @@ class GASBayesSHAP:
         self.state.extra["delta_total"] = float(delta_total)
         self.state.extra["x_hash"] = x_h
 
+        range_mode = str(self.config.get("range_mode", "spec"))
+        if range_mode not in ("spec", "empirical_max", "holdout"):
+            range_mode = "spec"
+        self._range_mode = range_mode
         if self.config.get("output_bounds") is not None:
             L, U = self.config["output_bounds"]
             R_delta_res = 4.0 * (U - L)
@@ -340,7 +344,11 @@ class GASBayesSHAP:
             L, U = heuristic_output_bounds(self.oracle.E_base, v_N, delta_total)
             R_delta_res = 4.0 * (U - L)
             heuristic_bounds = True
+        # empirical range modes are approximations -> never rigorous
+        if range_mode != "spec":
+            heuristic_bounds = True
         self.state.extra.update({"L": float(L), "U": float(U), "R_delta_res": float(R_delta_res)})
+        self._range_override = None  # set after the residual pilot
 
         self._log_event(STAGE_PREFLIGHT, "preflight", "OK",
                         delta_total=delta_total, L=L, U=U, R_delta_res=R_delta_res,
@@ -622,6 +630,21 @@ class GASBayesSHAP:
             for i in range(M):
                 sigma_res[s, i] = safe_std(store.values(i, s), 0.5)
 
+        # ---- empirical residual range (opt-in; review task #2) ------------------ #
+        if getattr(self, "_range_mode", "spec") != "spec":
+            from ..certification.empirical_range import per_stratum_ranges
+            spec_r = float(self.state.extra.get("R_delta_res", 4.0))
+            R_eff = per_stratum_ranges(store, M, mode=self._range_mode,
+                                       safety_factor=float(self.config.get("range_safety_factor", 2.0)),
+                                       delta=float(self.config.get("delta", 0.05)),
+                                       spec_range=spec_r)
+            self._range_override = float(np.max(R_eff[1:M-1])) if M > 2 else float(R_eff[1] if M == 2 else spec_r)
+            self.state.extra["R_delta_res_eff"] = self._range_override
+            self._log_event(STAGE_RESIDUAL_PILOT, "empirical_range", "OK",
+                            mode=self._range_mode, spec_range=spec_r,
+                            effective_range=self._range_override,
+                            reduction_ratio=spec_r / max(self._range_override, 1e-12))
+
         self.state.stage = STAGE_NEYMAN
         neyman = solve_coupled_neyman_allocation(sigma_res, M, K_cert=1.0)
         self._log_event(STAGE_NEYMAN, "neyman_allocated", "OK",
@@ -652,7 +675,7 @@ class GASBayesSHAP:
         self.state.stage = STAGE_ADAPTIVE
         self.state.iteration = start_iter
 
-        R_delta_res = float(self.state.extra.get("R_delta_res", 4.0))
+        R_delta_res = float(getattr(self, "_range_override", None) or self.state.extra.get("R_delta_res", 4.0))
         refresh_interval = (
             int(cfg["neyman_refresh_interval"])
             if cfg.get("neyman_refresh_interval")
@@ -951,6 +974,10 @@ class GASBayesSHAP:
                 "surrogate_shift": float(self._surrogate.shift) if self._surrogate else 0.0,
                 "n_gp_observations": int(len(self._surrogate.D_coalitions)) if self._surrogate is not None else 0,
                 "range_bounds": [float(self.state.extra.get("L")), float(self.state.extra.get("U"))],
+                "range_mode": getattr(self, "_range_mode", "spec"),
+                "R_delta_res_spec": float(self.state.extra.get("R_delta_res", 4.0)),
+                "R_delta_res_effective": float(self.state.extra.get("R_delta_res_eff",
+                                                self.state.extra.get("R_delta_res", 4.0))),
                 "cache_hit_rate": self._cache.hit_rate() if self._cache is not None else 0.0,
             },
         )

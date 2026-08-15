@@ -1,0 +1,2 @@
+dataset,K,n_instances,tier1_uniform_rmse_mean,tier2_neyman_rmse_mean,tier3_gp_rmse_mean,tier4_full_rmse_mean,tier4_evals_mean
+wine,400,3,0.05101707396848096,0.009106365480339653,0.08131311797566267,0.00376994496297881,502.3333333333333

@@ -1,0 +1,4 @@
+{"n_trials": 500, "M": 3, "epsilon": 1.5, "delta": 0.05, "max_budget": 300,
+ "finite_width_rate": 1.0, "empirical_coverage": 1.0, "coverage_given_finite": 1.0,
+ "mean_width": 12.3058, "median_width": 12.2894, "max_width": 12.6215,
+ "oracle_query_cost_mean": 350.0}

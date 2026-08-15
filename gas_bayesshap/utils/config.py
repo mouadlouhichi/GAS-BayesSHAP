@@ -47,6 +47,10 @@ DEFAULTS: Dict[str, Any] = {
     "n_trials": 30,            # coverage validation trials
     "numerical_tol": 1e-10,
     "finite_check": True,
+    # opt-in empirical residual-range tightening (review task #2)
+    # "spec" | "empirical_max" | "holdout"  (non-spec => heuristic bounds)
+    "range_mode": "spec",
+    "range_safety_factor": 2.0,
     # --- validation hooks ---
     "oracle_validation": False,
     "mathematical_validation": False,

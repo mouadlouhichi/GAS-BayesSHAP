@@ -1,0 +1,131 @@
+% GAS-BayesSHAP — manuscript skeleton (Q1 target)
+% Fill in author/affiliation fields before submission.
+\documentclass[11pt,twocolumn]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs,graphicx,multirow}
+\usepackage[colorlinks]{hyperref}
+\title{GAS-BayesSHAP: Anytime-Certified Bayesian Control Variates for Shapley Estimation}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Shapley-value estimation for black-box models faces an exponential
+combinatorial barrier and, in most practical estimators, an absence of
+distribution-free, anytime uncertainty quantification.  We propose
+GAS-BayesSHAP, which couples a bounded-linear Bayesian control variate with a
+Neyman-stratified residual certifier to deliver point estimates that match
+exact Shapley values to $10^{-3}$ RMSE at roughly $70\%$ of the exact
+enumeration budget, together with anytime empirical-Bernstein confidence
+sequences whose simultaneous coverage we validate at $R=500$ trials.  On real
+UCI wine and Beijing multi-site air-quality data ($M=11$), sign-certification
+is achievable in the regime where the certified width falls below the
+attribution magnitude; we characterize this certification cost frontier and
+show how empirical residual-range tightening shrinks the required budget by an
+order of magnitude. \emph{(Complete after width-tightening experiments.)}
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+% motivation, 2^M barrier, reliability gap; contribution list.
+
+\section{Related Work}\label{sec:related}
+% SamplingSHAP, KernelSHAP, TreeSHAP, ShaplEIG (2026), OddSHAP (2026), BQ.
+
+\section{Method}\label{sec:method}
+\subsection{Bounded linear control variate}\label{sec:bcv}
+The surrogate is $m_b(S)=c+\lambda h(S)$ with
+$h(S)=\mathbf{k}_{\mathcal{D}}(S)^\top\boldsymbol{\alpha}$,
+$\boldsymbol{\alpha}=(\mathbf{K}_{\mathcal{D}\mathcal{D}}+\eta^2 I)^{-1}\mathbf{y}$,
+conservative bounds $h_{\mathrm{lb}},h_{\mathrm{ub}}$ from the kernel range
+$[\sigma_0^2\rho^M,\sigma_0^2]$, shrinkage
+$\lambda=\min(1,(U-L)/(h_{\mathrm{ub}}-h_{\mathrm{lb}}))$, and shift
+$c=L-\lambda h_{\mathrm{lb}}$, guaranteeing $m_b(S)\in[L,U]$ without clipping.
+The surrogate attribution is closed-form
+$\boldsymbol{\phi}(m_b)=\lambda\mathbf{K}_{\phi,\mathcal{D}}\boldsymbol{\alpha}$
+(Lemma~D, $O(M^2)$), with prior covariance $\mathbf{K}_{\phi,\phi}$ (Lemma~E,
+$O(M^3)$) and $\lambda^2$-scaled posterior covariance.
+
+\subsection{Neyman-stratified residual certification}\label{sec:cert}
+Residuals $R_i(S)=\Delta_i^v(S)-\Delta_i^{m_b}(S)$ are sampled with
+add-one/remove-one marginals (Lemma~F).  Extreme singleton strata
+$s\in\{0,M-1\}$ are exact (Lemma~G).  Interior strata are allocated by the
+coupled adjacent-stratum Neyman program (Theorem~A) and certified by an
+anytime empirical-Bernstein sequence (Theorem~B) with per-cell widths
+\begin{equation}
+W_i^{\mathrm{res}}(\mathbf{n}_i)=\frac1M\sum_{s=1}^{M-2}
+\left[\sqrt{\frac{2(\hat\sigma_{i,s}^r)^2\log(\pi^2 M^2 n_{i,s}^2/3\delta)}{n_{i,s}}}
++\frac{7 R_\Delta^{\mathrm{res}}\log(\pi^2 M^2 n_{i,s}^2/3\delta)}{3(n_{i,s}-1)}\right].
+\end{equation}
+
+\subsection{Efficiency projection and sign certification}\label{sec:proj}
+The raw estimator $\hat{\boldsymbol{\phi}}^{\mathrm{raw}}=
+\boldsymbol{\phi}(m_b)+\hat{\boldsymbol{\phi}}(r_{\mathcal{D}})$ is projected
+onto $\sum_i\phi_i=\Delta_{\mathrm{total}}$ with posterior-diagonal weights
+(Theorem~C); Corollary~C.1 gives post-projection widths
+$W_i^{\mathrm{proj}}=W_i^{\mathrm{res}}+(v_i/\sum_j v_j)\sum_j W_j^{\mathrm{res}}$,
+and a feature is \emph{sign-certified} iff $|\phi_i^*|>W_i^{\mathrm{proj}}$.
+
+\subsection{Empirical residual-range tightening (contribution)}\label{sec:tight}
+Section~3.5: opt-in per-stratum empirical range replacing the conservative
+$R_\Delta^{\mathrm{res}}=4(U-L)$ (flagged heuristic); demonstrated width
+reduction.
+
+\section{Experiments}\label{sec:exp}
+% RQ1 fidelity table; RQ2 coverage R=500; RQ3 regime semantics; RQ5 matched
+% budget curves; ablation; OddSHAP/ShaplEIG baselines.
+\begin{table}[t]\centering\small
+\begin{tabular}{lccl}
+\toprule
+Dataset & Method & RMSE vs exact & Coalition evals \\
+\midrule
+Wine ($M{=}11$) & GAS-BayesSHAP & 0.0016 & 1442 \\
+& KernelSHAP & 0.0044 & 256 \\
+& SamplingSHAP & 0.0443 & 1045 \\
+& Exact & 0 & 2048 \\
+\addlinespace
+Air ($M{=}11$) & GAS-BayesSHAP & 0.0019 & 1441 \\
+& KernelSHAP & 0.0048 & 256 \\
+& SamplingSHAP & 0.0377 & 1045 \\
+& Exact & 0 & 2048 \\
+\bottomrule
+\end{tabular}
+\caption{RQ1: attribution fidelity (N=20 instances, real data, $\epsilon{=}0.05$).}
+\end{table}
+
+\begin{table}[t]\centering\small
+\begin{tabular}{lc}
+\toprule
+Tier & RMSE vs exact \\
+\midrule
+Uniform MC & 0.051 \\
+Neyman MC & 0.009 \\
+GP-only & 0.081 \\
+Full GAS-BayesSHAP & 0.004 \\
+\bottomrule
+\end{tabular}
+\caption{4-tier ablation (wine, K=400, N=3).}
+\end{table}
+
+\section{The certification cost frontier}\label{sec:frontier}
+Width decays as $W\approx 318/\sqrt{K}$; sign-certification requires
+$K\sim10^5$--$10^6$ at the spec range and $K\sim10^4$--$10^5$ with the
+empirical range.  Figure: width-vs-budget curve.
+
+\section{Limitations and future work}\label{sec:lim}
+% width theory; regime labeling; black-box DEC/Transformer; large-R real-data.
+
+\section*{Data and code availability}
+% repo link; all artifacts in main_results/.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+\bibitem{castro2009} A. Castro, J. G\'omez, J. Tejada. \emph{Polynomial
+calculation of the Shapley value based on sampling}. Computers \& OR, 2009.
+\bibitem{lundberg2017} S. Lundberg, S.-I. Lee. \emph{A unified approach to
+interpreting model predictions}. NeurIPS 2017.
+\end{thebibliography}
+\end{document}

@@ -694,7 +694,7 @@ W_proj_g = np.asarray(res_g["certified_projected_widths"])
 print("status:", res_g["status"], "| converged:", res_g["converged"],
       "| rigorous:", res_g["certificate_is_rigorous"])
 print("macro coalition evals (this call):", res_g["num_coalition_evals_this_call"])
-macro_names = [f"var_{j} (6 lags)" for j in range(11)]
+macro_names = [f"{FEATURES[j]} (6 lags)" for j in range(11)]  # pollutant names
 print("macro RMSE vs exact:", round(float(rmse(phi_gas_g, phi_exact_g)), 6))
 err_g = np.abs(phi_gas_g - phi_exact_g)
 macro_sim = float(np.all(err_g <= W_proj_g))
