@@ -43,22 +43,35 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
   rigorous at that level, and reaches the nominal 1−δ once the coupon
   thresholds hold (Corollary E).
 - Real-data check: simultaneous coverage 1.0 on all N=50 instances of RQ1.
+- Tight-ε calibration (ε ∈ {0.05, 0.1, 0.2, 0.5}, R=200, both modes):
+  coverage 1.0 and finite-width rate 1.0 at every ε
+  (`paper_calibration_eps{eps}_{mode}.json`); fp widths 0.57–0.95.
+- Adversarial stress test (`paper_stress_finite_population.json`, R=200):
+  M=3 coupon closes → nominal level reached on 99.5% of trials, coverage
+  1.0; M=6 coupon open → `certificate_at_nominal_level=False`, realised
+  level 0.0 honestly reported (never claims nominal coverage while open).
 
 ## RQ2b — Finite-population width tightening (real data)
 
-`paper_wine_range_modes_n5_summary.csv`, `paper_wine_range_modes_n5.csv`
+`paper_wine_n50_budget3000_rangefinite_population_summary.csv`,
+`paper_air_n50_budget3000_rangefinite_population_summary.csv` (N=50 each),
+`paper_wine_range_modes_n5_summary.csv` (matched probe)
 
-| Mode | RMSE | Mean width | Sim. cov | Sign-cert | R_eff |
+| Setting | Mode | RMSE | Mean width | Sim. cov | Sign-cert |
 |---|---:|---:|---:|---:|---:|
-| Spec | 0.00059 | 8.75 | 1.0 | 0 | 4.0 |
-| Finite-population | 0.00059 | **0.94** | 1.0 | 0 | 0.42 |
+| Wine N=50, K=3000 | Spec | 0.00168 | 9.15 | 1.0 | 0 |
+| Wine N=50, K=3000 | Finite-pop | 0.00168 | **1.90** | 1.0 | 0 |
+| Air N=50, K=3000 | Spec | 0.00186 | 9.43 | 1.0 | 0 |
+| Air N=50, K=3000 | Finite-pop | 0.00186 | **1.85** | 1.0 | 0 |
+| Wine N=5, K=3000 | Spec | 0.00059 | 8.75 | 1.0 | 0 |
+| Wine N=5, K=3000 | Finite-pop | 0.00059 | **0.94** | 1.0 | 0 |
 
-- 9.3× width reduction at identical RMSE and coverage (wine, K=3000, N=5).
-- **Honest caveat:** at K=3000 the coupon collector is still open on the
-  M=11 game (δ1 ≈ 59, realised level 0): the width reduction is real, but
-  the *nominal* 1−δ certificate requires the frontier budget
-  (K ≈ 2×10^5 for M=11, Corollary E).  This is exactly what the
-  certification cost frontier (below) characterises.
+- **4.8–9.3× width reduction at identical RMSE and coverage.**  At the
+  standard budget the fp width (~1.9) is still above the dominant
+  attribution (~0.26), so sign-cert remains 0 at K=3000 — honest.
+- The *nominal* 1−δ certificate requires the coupon-completed frontier
+  budget (K ≈ 2×10^5 for M=11, Corollary E), demonstrated in the probe
+  (below).
 
 ## RQ3 — Regime semantics (air quality, Aotizhongxin station)
 
@@ -66,14 +79,15 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
 
 | Regime | N instances | RMSE | Spearman |
 |---|---:|---:|---:|
-| winter_smog | 1 | 0.00179 | 0.642 |
-| photochemical | 1 | 0.00165 | 0.601 |
-| clean_air | 2 | 0.00396 | 0.179 |
+| winter_smog | 5 | 0.00101 | 0.559 |
+| photochemical | 5 | 0.00206 | 0.418 |
+| clean_air | 10 | 0.00256 | 0.056 |
 
 - Regimes are named by driver profile (winter_smog: PM10/CO/PM2.5;
-  photochemical: O3/NO2/WSPM).  **Honest caveat:** N per regime is
-  pilot-scale; a N≥20-per-regime run is required before this is a paper
-  claim.
+  photochemical: O3/NO2/WSPM).  N=20 instances total (up from the pilot
+  N=1–2).  **Honest caveat:** clean_air has near-zero attributions, so its
+  low Spearman is noise-dominated (expected, not a failure); N per regime
+  is still modest (5–10).
 
 ## RQ4 — Ablation (wine, N=20)
 
@@ -125,12 +139,22 @@ both slightly.)
 
 ## SOTA-style baselines
 
-`gas_bayesshap/benchmarking/sota_baselines.py` + `scripts/run_sota_baselines.py`
-produce OddSHAP-style (exact log-odds Shapley) and ShaplEIG-style (GP
-posterior-mean Shapley) comparisons.  **Honest labelling:** official
+`paper_sota_baselines_comparison.csv` (N=20, wine + air, K ∈ {256,1024,2048})
+from `gas_bayesshap/benchmarking/sota_baselines.py` +
+`scripts/run_sota_baselines.py`.  **Honest labelling:** official
 OddSHAP / ShaplEIG code is not public in this environment; these are
-method-style reimplementations from their published descriptions, reported
-as non-certified reference points — not official reproductions.
+method-style reimplementations, reported as non-certified reference points
+— not official reproductions.
+
+**Comparability caveat (important):** the OddSHAP-style baseline computes
+the exact Shapley of the *log-odds* game, whose attributions are on an
+unbounded scale — its RMSE vs the membership-game exact (≈1.5–1.7) is
+~440–540× GAS's and is dominated by the transform's scale, not by
+estimation error.  It is therefore reported as a *transform-sensitivity*
+reference, not a fidelity baseline.  The ShaplEIG-style GP quadrature
+(RMSE ≈0.077–0.086 on the membership game, same scale as GAS) confirms
+that a surrogate without residual correction is insufficient for fidelity —
+consistent with the ablation's GP-only tier.
 
 ## The certification cost frontier
 
@@ -151,9 +175,13 @@ as non-certified reference points — not official reproductions.
   At K ≥ 3×10^4 the dominant feature (|φ*|=0.257) is sign-certified with
   the certified sign matching the exact sign (`paper_width_probe_
   finite_population.csv`: 1 feature at K=30k/100k, signs_match_exact=1,
-  margin 0.168 at 100k).  Honest caveat: realised level 0.372 at K=100k
-  (δ1=0.60); the nominal 1−δ certificate requires K ≈ 2×10^5
-  (Corollary E).
+  margin 0.168 at 100k).
+- **Nominal certification closes at K=2×10^5** (Corollary E confirmed on
+  real data): at K=150k realised level 0.892 (coupon open); at K=200k the
+  run **converges with status CERTIFIED**, δ1=0.013, realised level 0.962,
+  1 feature sign-certified, signs_match_exact=1, margin 0.207 — the first
+  run of the project to reach the nominal 1−δ level at feasible budget on
+  an M=11 real game.
 
 ## What can / cannot be claimed
 

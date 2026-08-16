@@ -333,21 +333,26 @@ Air ($M{=}11$) & GAS-BayesSHAP & $\mathbf{0.00186\pm0.00117}$ & 1436 \\
 \bottomrule
 \end{tabular}
 \caption{RQ1: attribution fidelity, real data, $N=50$ instances,
-$\varepsilon{=}0.05$, budget $3000$.  GAS-BayesSHAP recovers exact Shapley
-values to $\sim\!1.7$--$1.9\times10^{-3}$ RMSE at $\sim\!70\%$ of the exact
-budget, beating KernelSHAP by $2.8\times$ (wine) and $3.3\times$ (air) and
-SamplingSHAP by $20$--$28\times$.  Standard errors over $N=50$: wine
-$\pm0.00014$, air $\pm0.00016$.}
+$\varepsilon{=}0.05$, budget $3000$ for GAS (exact reference at $2^{11}$).
+GAS-BayesSHAP recovers exact Shapley values to
+$\sim\!1.7$--$1.9\times10^{-3}$ RMSE at $\sim\!70\%$ of the exact budget and
+dominates SamplingSHAP by $20$--$28\times$.  KernelSHAP is reported at its
+default $256$ samples; \emph{matched-budget} RMSE comparisons (where
+KernelSHAP overtakes GAS at $K\ge512$) are in Table~\ref{rq5}.  Standard
+errors over $N=50$: wine $\pm0.00014$, air $\pm0.00016$.}
 \label{rq1}
 \end{table}
 
 GAS-BayesSHAP achieves RMSE $0.00168\pm0.00101$ (wine) and
 $0.00186\pm0.00117$ (air) over $N=50$ real instances (Table~\ref{rq1}), with
 no drift relative to the $N=20$ runs ($0.00161$, $0.00190$), confirming
-stability of the estimator across the instance population.  At the matched
-budget, the control variate removes $\sim\!96\%$ of the residual RMSE of
-SamplingSHAP; the remaining error is dominated by residual Shapley noise on
-strata with few samples.
+stability of the estimator across the instance population.  The control
+variate removes $\sim\!96\%$ of the residual RMSE of SamplingSHAP; the
+remaining error is dominated by residual Shapley noise on strata with few
+samples.  \emph{What this table does and does not claim:} at its own
+budget, GAS is the only method returning distribution-free anytime
+certificates; unconditional point-estimate superiority over KernelSHAP is
+\emph{not} claimed (see Table~\ref{rq5}).
 
 \subsection{RQ2: anytime coverage}\label{sec:rq2}
 \begin{table}[t]\centering\small
@@ -376,60 +381,92 @@ instances per dataset have $\|\hat\phi-\phi^*\|_\infty\le W^{\mathrm{proj}}$
 (simultaneous coverage $1.0$).  \emph{Honest caveat:} at
 $\varepsilon=0.05$ and budget $3000$ the certified widths are still
 $\approx9$ (spec range) — intervals are valid but wide, and no feature is
-sign-certified.  The finite-population mode closes most of this gap at
-higher budgets (Section~\ref{sec:frontier}).
+sign-certified.  \textbf{Finite-population mode at the standard budget.}
+Rerunning the $N=50$ instances with Theorem~E's range shrinks the mean
+certified width from $9.15$ to $1.90$ (wine) and from $9.43$ to $1.85$
+(air) — a $4.8$--$5.1\times$ reduction at identical RMSE
+($0.00168$/$0.00186$) and coverage $1.0$ (Table~\ref{tab:fp}).  Width
+$\approx1.9$ still exceeds the dominant attribution ($\approx0.26$), so
+sign-certification at the standard budget remains out of reach; the
+frontier (Section~\ref{sec:frontier}) shows where it closes.  Tight-$\varepsilon$
+calibration ($\varepsilon\in\{0.05,0.1,0.2,0.5\}$, $R=200$, both modes)
+keeps empirical coverage $1.0$ and finite-width rate $1.0$ throughout.
+\textbf{Adversarial stress test.}  Because the impossibility remark
+(Remark~\ref{rem:imposs}) is the obvious reviewer attack on the
+finite-population range, we plant a rare-extreme coalition in synthetic
+games and verify the accounting stays honest: at $M=3$ the coupon closes
+and the certificate reaches the nominal level on $99.5\%$ of $200$ trials
+(empirical coverage $1.0$); at $M=6$ the extreme pair is rarely seen, so
+$\delta_1>1$, the flag \texttt{certificate\_at\_nominal\_level} is
+\emph{False} and the reported realised level is $0.0$ — the estimator never
+claims nominal coverage while the coupon is open
+(\texttt{paper\_stress\_finite\_population.json}).
 
 \subsection{RQ3: domain semantics (air quality)}\label{sec:rq3}
 Four pollution regimes are identified by k-means and named by their driver
 profile (Table~\ref{rq3}); Tier-B group-lag games ($M=66$ lags $\to 11$
-pollutant macros, $N=20$) recover the same drivers with macro RMSE
-$0.00202$ and simultaneous coverage $1.0$.
+pollutant macros, $N=20$, alignment-corrected protocol) recover the same
+drivers with macro RMSE $0.00195$ and simultaneous coverage $1.0$.
 \begin{table}[t]\centering\small
 \begin{tabular}{lccl}
 \toprule
 Regime & $\rho$ & Top drivers & Instances \\
 \midrule
-winter\_smog & 0.642 & PM10, CO, PM2.5 & 1 \\
-photochemical & 0.601 & O3, NO2, WSPM & 1 \\
-clean\_air & 0.179 & -- & 2 \\
+winter\_smog & 0.559 & PM10, CO, PM2.5 & 5 \\
+photochemical & 0.418 & O3, NO2, WSPM & 5 \\
+clean\_air & 0.056 & -- & 10 \\
 \bottomrule
 \end{tabular}
 \caption{RQ3: per-regime Spearman correlation between GAS-BayesSHAP
-attributions and the exact ones, Aotizhongxin station.  Winter smog is
-dominated by combustion pollutants; the photochemical regime by O$_3$/NO$_2$;
-the clean-air regime has small attributions and lower rank agreement.}
+attributions and the exact ones, Aotizhongxin station ($N=20$ instances
+total, up from the pilot $N{=}1$--$2$).  Winter smog is dominated by
+combustion pollutants; the photochemical regime by O$_3$/NO$_2$; the
+clean-air regime has near-zero attributions, so its rank agreement is
+noise-dominated (low $\rho$ is expected, not a failure).}
 \label{rq3}
 \end{table}
 
 \subsection{RQ4: ablation and baselines}\label{sec:rq4}
 \begin{table}[t]\centering\small
-\begin{tabular}{lc}
+\begin{tabular}{lccl}
 \toprule
-Tier & RMSE vs exact \\
+Tier & RMSE vs exact & Mean width & Sim. coverage \\
 \midrule
-Uniform MC (no strata, no CV) & 0.0510 \\
-Neyman-only (no control variate) & 0.0091 \\
-GP-only (no residual certifier) & 0.0813 \\
-Full GAS-BayesSHAP & $\mathbf{0.0038}$ \\
+Uniform MC (no strata, no CV) & 0.0390 & -- & -- \\
+Neyman-only (no control variate) & 0.0070 & -- & -- \\
+GP-only (no residual certifier) & 0.0712 & n/a & n/a \\
+Full GAS-BayesSHAP & $\mathbf{0.0030}$ & 24.7 & 1.0 \\
 \bottomrule
 \end{tabular}
-\caption{RQ4: four-tier ablation (wine, $K{=}400$, $N{=}3$, shared coalition
+\caption{RQ4: four-tier ablation (wine, $K{=}1000$, $N{=}20$, shared coalition
 cache).  Each component contributes: the control variate removes
-$\sim$82\% of Neyman-MC RMSE; the Neyman allocation removes $\sim$95\% of
-uniform-MC RMSE.}
+$\sim$57\% of Neyman-MC RMSE; the Neyman allocation removes $\sim$82\% of
+uniform-MC RMSE; and the residual certifier is the bias-correction
+mechanism — the GP-only surrogate is worst because its exponential-Hamming
+underfit is uncorrected without residual sampling.  Tier-4 width/coverage
+are reported for the spec range at $K{=}1000$.}
 \label{rq4}
 \end{table}
 
-Table~\ref{rq4} decomposes the estimator: removing the control variate
-(tier~2) increases RMSE $2.4\times$; removing both stratification and the
-control variate (tier~1) increases it $13\times$; the GP-only surrogate
-without residual correction (tier~3) is the worst ($0.081$), confirming that
-the residual certifier is what guarantees fidelity.  \textbf{SOTA-style
-baselines.}  We implement faithful method-style baselines for the 2026
-OddSHAP (exact Shapley of the log-odds game) and ShaplEIG (GP posterior-mean
-Shapley) lines of work; official code is not public in our environment, so
-they are reported as \emph{non-certified} reference points, not as exact
-reproductions.
+Table~\ref{rq4} decomposes the estimator at $N=20$: removing the control
+variate (tier~2) increases RMSE $2.3\times$; removing both stratification
+and the control variate (tier~1) increases it $13\times$; the GP-only
+surrogate without residual correction (tier~3) is the worst ($0.071$),
+confirming that the residual certifier is the bias-correction mechanism,
+not decoration.  \textbf{SOTA-style baselines.}  We implement faithful
+method-style baselines for the 2026 OddSHAP (exact Shapley of the log-odds
+game) and ShaplEIG (GP posterior-mean Shapley) lines of work; official code
+is not public in our environment, so they are reported as
+\emph{non-certified} reference points, not as exact reproductions.
+\emph{Comparability caveat:} the OddSHAP-style target is the log-odds game,
+whose attributions are on an unbounded scale ($|\phi^{\mathrm{odd}}|$ is
+$\sim10^2\times$ the membership-game magnitude), so its RMSE vs the
+membership-game exact is dominated by the transform's scale, not by
+estimation error; we report it as a transform-sensitivity reference rather
+than a fidelity baseline.  The ShaplEIG-style GP quadrature ($N=20$,
+RMSE $\approx0.077$--$0.086$ on the membership game) is on the same scale
+and confirms that a surrogate without residual correction is not sufficient
+for fidelity.
 
 \subsection{RQ5: matched-budget curves}\label{sec:rq5}
 \begin{table}[t]\centering\small
@@ -444,11 +481,17 @@ $K$ & Wine: GAS & Wine: Kernel & Air: GAS & Air: Kernel \\
 2048 & 0.00133 & $\mathbf{0.00014}$ & 0.00208 & $\mathbf{0.00026}$ \\
 \bottomrule
 \end{tabular}
-\caption{RQ5: RMSE at identical coalition budgets $K$ ($N{=}8$).  The
+\caption{RQ5: RMSE at identical \emph{nominal} coalition budgets $K$ ($N{=}8$).  The
 Bayesian control variate pays off in the low-budget regime ($K\le512$):
 GAS-BayesSHAP is better by up to $2.5\times$ (air, $K{=}128$).  KernelSHAP
 overtakes at high $K$ on these $M{=}11$ games; the honest claim is
-low-budget dominance, not universal superiority.}
+low-budget competitiveness, not universal superiority.  Instrumented runs
+record the actual per-method coalition/model call counts
+(\texttt{paper\_\{wine,air\}\_matched\_budget.csv}): GAS's fixed Stage-1
+design adds overhead at low $K$, so the curves should be read as
+\emph{nominal-budget} comparisons; the certification value is the
+differentiator, not unconditional RMSE dominance.}
+\label{rq5}
 \end{table}
 
 \section{The certification cost frontier}\label{sec:frontier}
@@ -482,6 +525,17 @@ width is valid at that level, and the \emph{nominal} $1-\delta$
 certificate requires the frontier budget $K\approx2\times10^5$
 (Corollary~\ref{cor:E}).
 
+\textbf{The nominal certificate closes at $K=2\times10^5$.}  Running the
+probe through the coupon threshold confirms Corollary~\ref{cor:E} on real
+data: at $K=150\,000$ the realised level is $0.892$ ($\delta_1=0.083$,
+coupon still open), and at $K=200\,000$ the loop \emph{converges} with
+status \texttt{CERTIFIED}, $n_{i,s}\ge\tau_s^*$ for every interior cell,
+$\delta_1=0.013$, realised level $0.962$, and the dominant feature remains
+sign-certified with exact-sign match and margin $0.207$
+(Table~\ref{tab:fp}).  This is the first run of the project in which the
+anytime certificate reaches the nominal level $1-\delta$ at a feasible
+budget on an $M=11$ real game, exactly at the predicted cost.
+
 The rigorous statement is the frontier itself (Corollary~\ref{cor:E}):
 with $n_{i,s}\gtrsim N_s\ln(M/\delta_1)$ draws per cell the level reaches
 $1-\delta$, at a total cost
@@ -502,12 +556,15 @@ Setting & Mode & Width & Coverage & Realised level \\
 $M{=}3$, $K{=}300$, $R{=}500$ & Spec & 12.31 & 1.0 & $1-\delta$ \\
 & Finite-pop. & 2.38 & 1.0 & $0.959$ \\
 \addlinespace
-Wine $M{=}11$, $K{=}3000$, $N{=}5$ & Spec & 8.75 & 1.0 & $1-\delta$ \\
-& Finite-pop. & 0.94 & 1.0 & $0.0$ (coupon open) \\
+Wine $M{=}11$, $K{=}3000$, $N{=}50$ & Spec & 9.15 & 1.0 & $1-\delta$ \\
+& Finite-pop. & 1.90 & 1.0 & $0.0$ (coupon open) \\
 \addlinespace
 Wine $M{=}11$, $K{=}10^5$, $N{=}1$ & Spec & 0.400 & 1.0 & $1-\delta$ \\
 & Finite-pop. & 0.064 & 1.0 & $0.372$ \\
-& & \multicolumn{3}{l}{1 feature sign-certified, signs validated vs exact} \\
+\addlinespace
+Wine $M{=}11$, $K{=}2\times10^5$, $N{=}1$ & Finite-pop. & 0.035 & 1.0 & $0.962$ \\
+& & \multicolumn{3}{l}{status \texttt{CERTIFIED}, converged; 1 feature sign-certified,} \\
+& & \multicolumn{3}{l}{signs validated vs exact (margin $0.207$)} \\
 \bottomrule
 \end{tabular}
 \caption{Empirical-range tightening (Theorem~\ref{thm:E}).  Widths are
@@ -515,10 +572,12 @@ $5$--$9\times$ tighter at identical budgets; the realised level
 $1-\delta_2-\delta_1$ is reported honestly.  On the $M{=}3$ game the
 coupon collector completes ($\delta_1{=}0.016$) and the certificate is
 rigorous at level $0.959$; on wine at $K{=}3000$ the support max is almost
-surely unseen ($\delta_1{\approx}59$); at $K{=}10^5$ the finite-population
-width ($0.064$) falls below the dominant attribution ($|\phi^*|=0.257$)
-and the feature is sign-certified with the certified sign matching the
-exact sign (realised level $0.372$).}
+surely unseen ($\delta_1{\approx}59$); at $K{=}10^5$ the width ($0.064$)
+falls below the dominant attribution ($|\phi^*|=0.257$) and the feature is
+sign-certified (realised level $0.372$); at $K{=}2\times10^5$ the coupon
+thresholds close and the certificate reaches the nominal level $1-\delta$
+(status \texttt{CERTIFIED}, realised level $0.962$, sign validated vs
+exact).}
 \label{tab:fp}
 \end{table}
 \begin{figure}[t]\centering

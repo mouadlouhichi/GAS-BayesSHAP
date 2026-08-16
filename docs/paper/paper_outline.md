@@ -55,10 +55,14 @@ Information Fusion / Machine Learning (applied framing).
    - Baselines: OddSHAP-style log-odds (exact), ShaplEIG-style GP
      quadrature (both non-certified, method-style), KernelSHAP,
      SamplingSHAP; matched-budget comparison CSV.
-   - Frontier: fp probe K=2k..100k — width ~6.5x tighter than spec;
+   - Frontier: fp probe K=2k..200k — width ~6.5x tighter than spec;
      sign-cert of the dominant feature (|phi|=0.257) at K>=30k, signs
-     validated vs exact, margin 0.168 at 100k; realised level 0.372 at
-     100k; nominal 1-delta at K~2e5 (Corollary E).
+     validated vs exact; **nominal 1-delta CERTIFIED at K=200k** (converged,
+     realised level 0.962, delta1=0.013, margin 0.207) — Corollary E
+     confirmed on real data.
+   - Adversarial stress test (R=200): M=3 coupon closes -> nominal reached
+     on 99.5% of trials; M=6 coupon open -> flag False, level 0.0 honest.
+   - Tight-eps calibration (0.05..0.5, R=200, both modes): coverage 1.0.
 
 5. **Certification cost frontier** (the honest finding)
    - Width vs K: W ~ 318/sqrt(K); sign-cert feasible at K ~ 1e5-1e6 with
