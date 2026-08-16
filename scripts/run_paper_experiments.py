@@ -242,6 +242,7 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
             cid = i % n_clusters
             fn = make_proba_fn(m, feat_names, cid)
             bg = X.sample(64, random_state=1301 + i).values
+            gas_ev, gas_me, ker_me, mc_me = [], [], [], []
             try:
                 eng = GASBayesSHAP(fn, bg, output_bounds=(0.0, 1.0),
                                    rng=np.random.RandomState(1301 + i),
@@ -254,22 +255,38 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
                     exact_game_values(CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0)), x0, X.shape[1]),
                     X.shape[1])
                 r_gas.append(rmse(np.asarray(r["shapley_values"]), phi_exact))
-                # KernelSHAP at K
-                ke = shap.KernelExplainer(_proba_matrix_fn(fn), bg)
+                gas_ev.append(r["num_coalition_evals_this_call"])
+                gas_me.append(r.get("num_model_evals_this_call", 0))
+                # KernelSHAP at K (instrumented: count actual model forward passes)
+                kcalls = {"n": 0}
+                def fn_counted(xx):
+                    kcalls["n"] += 1
+                    return fn(xx)
+                ke = shap.KernelExplainer(_proba_matrix_fn(fn_counted), bg)
                 kp = ke.shap_values(x0, nsamples=K)
                 r_ker.append(rmse(np.asarray(kp), phi_exact))
-                # SamplingSHAP at ~K coalition evals
+                ker_me.append(kcalls["n"])
+                # SamplingSHAP at ~K coalition evals (instrumented via oracle counter)
                 mc_oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0))
                 mc = monte_carlo_shapley(mc_oracle, x0, n_samples=max(10, K // (X.shape[1] + 1)),
                                          rng=np.random.RandomState(1301 + i))
                 r_mc.append(rmse(np.asarray(mc["shapley_values"]), phi_exact))
+                mc_me.append(mc_oracle.total_model_evals)
             except Exception as e:
                 print(f"  K={K} inst {i} FAILED: {str(e)[:100]}")
         rows.append({"K": K,
                      "gas_rmse": float(np.mean(r_gas)) if r_gas else np.nan,
                      "kernel_rmse": float(np.mean(r_ker)) if r_ker else np.nan,
-                     "mc_rmse": float(np.mean(r_mc)) if r_mc else np.nan})
-        print(f"  K={K}: gas={rows[-1]['gas_rmse']:.5f} kernel={rows[-1]['kernel_rmse']:.5f} mc={rows[-1]['mc_rmse']:.5f}")
+                     "mc_rmse": float(np.mean(r_mc)) if r_mc else np.nan,
+                     "gas_coalition_evals_actual": float(np.mean(gas_ev)) if gas_ev else np.nan,
+                     "gas_model_evals_actual": float(np.mean(gas_me)) if gas_me else np.nan,
+                     "kernel_model_evals_actual": float(np.mean(ker_me)) if ker_me else np.nan,
+                     "mc_model_evals_actual": float(np.mean(mc_me)) if mc_me else np.nan})
+        print(f"  K={K}: gas={rows[-1]['gas_rmse']:.5f} kernel={rows[-1]['kernel_rmse']:.5f} "
+              f"mc={rows[-1]['mc_rmse']:.5f} | gas_ev={rows[-1]['gas_coalition_evals_actual']:.0f} "
+              f"gas_me={rows[-1]['gas_model_evals_actual']:.0f} "
+              f"ker_me={rows[-1]['kernel_model_evals_actual']:.0f} "
+              f"mc_me={rows[-1]['mc_model_evals_actual']:.0f}")
     df = pd.DataFrame(rows)
     df.to_csv(out(f"{name}_matched_budget.csv"), index=False)
     return df
