@@ -1,0 +1,2 @@
+dataset,n_instances,clusters,eps,budget,rmse_gas_mean,rmse_gas_std,rmse_kernel_mean,rmse_mc_mean,simultaneous_coverage_rate,marginal_coverage_rate,sign_certified_fraction,mean_width,max_width_max,gas_evals_mean,exact_evals,kernel_evals,mc_evals_mean,converged_fraction,status_counts
+air,50,4,0.05,3000,0.001863228288492377,0.0011657986246616453,0.006063201876210734,0.03695107201335875,1.0,1.0,0.0,9.431488272404085,16.633064209007745,1436.08,2048,256,1629.96,0.0,{'BUDGET_EXHAUSTED': 50}
