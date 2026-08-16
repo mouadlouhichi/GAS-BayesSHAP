@@ -27,7 +27,8 @@
    "oracle_query_cost_mean": 98.64,
    "range_mode": "finite_population",
    "finite_population_delta1_mean": 0.016146944738924505,
-   "realised_coverage_level_mean": 0.9588530552610752
+   "realised_coverage_level_mean": 0.9588530552610752,
+   "at_nominal_level_fraction": 0.782
   }
  }
 }
