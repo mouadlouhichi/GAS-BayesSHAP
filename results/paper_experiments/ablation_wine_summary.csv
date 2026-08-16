@@ -1,2 +1,2 @@
-dataset,K,n_instances,tier1_uniform_rmse_mean,tier2_neyman_rmse_mean,tier3_gp_rmse_mean,tier4_full_rmse_mean,tier4_evals_mean
-wine,400,3,0.05101707396848096,0.009106365480339653,0.08131311797566267,0.00376994496297881,502.3333333333333
+dataset,K,n_instances,tier1_uniform_rmse_mean,tier2_neyman_rmse_mean,tier3_gp_rmse_mean,tier4_full_rmse_mean,tier4_evals_mean,tier4_mean_width,tier4_sim_cov_rate,tier4_sign_cert_fraction
+wine,1000,20,0.03898952168760004,0.006993645377577638,0.07118151999012931,0.0030221703611020235,802.25,24.703775278242595,1.0,0.0

@@ -1,0 +1,12 @@
+{
+ "epsilon": 0.5,
+ "mode": "finite_population",
+ "trials": 200,
+ "finite_width_rate": 1.0,
+ "empirical_coverage": 1.0,
+ "coverage_given_finite": 1.0,
+ "mean_width": 0.9474,
+ "median_width": 0.9111,
+ "max_width": 2.218,
+ "oracle_query_cost_mean": 202.6
+}

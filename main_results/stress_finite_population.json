@@ -1,0 +1,28 @@
+{
+ "trials": 200,
+ "delta": 0.05,
+ "results": [
+  {
+   "M": 3,
+   "trials": 200,
+   "finite_width_rate": 1.0,
+   "empirical_coverage_all": 1.0,
+   "empirical_coverage_given_nominal": 1.0,
+   "fraction_at_nominal_level": 0.995,
+   "mean_delta1": 0.0006317436043173075,
+   "mean_realised_level": 0.9743682563956824,
+   "min_realised_level": 0.94375
+  },
+  {
+   "M": 6,
+   "trials": 200,
+   "finite_width_rate": 1.0,
+   "empirical_coverage_all": 1.0,
+   "empirical_coverage_given_nominal": 1.0,
+   "fraction_at_nominal_level": 0.0,
+   "mean_delta1": 4.563773068521858,
+   "mean_realised_level": 0.0,
+   "min_realised_level": 0.0
+  }
+ ]
+}
