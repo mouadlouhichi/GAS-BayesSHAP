@@ -1,0 +1,33 @@
+{
+ "n_trials": 500,
+ "M": 3,
+ "epsilon": 1.5,
+ "delta": 0.05,
+ "max_budget": 300,
+ "modes": {
+  "spec": {
+   "n_trials": 500,
+   "finite_width_rate": 1.0,
+   "empirical_coverage": 1.0,
+   "coverage_given_finite": 1.0,
+   "mean_width": 12.305700427194278,
+   "median_width": 12.282329170966706,
+   "max_width": 12.716153134049078,
+   "oracle_query_cost_mean": 350.0,
+   "range_mode": "spec"
+  },
+  "finite_population": {
+   "n_trials": 500,
+   "finite_width_rate": 1.0,
+   "empirical_coverage": 1.0,
+   "coverage_given_finite": 1.0,
+   "mean_width": 2.3793038348018403,
+   "median_width": 2.389932072841694,
+   "max_width": 2.961100996111201,
+   "oracle_query_cost_mean": 98.64,
+   "range_mode": "finite_population",
+   "finite_population_delta1_mean": 0.016146944738924505,
+   "realised_coverage_level_mean": 0.9588530552610752
+  }
+ }
+}

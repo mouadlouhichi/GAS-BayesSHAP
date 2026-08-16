@@ -333,7 +333,7 @@ class GASBayesSHAP:
         self.state.extra["x_hash"] = x_h
 
         range_mode = str(self.config.get("range_mode", "spec"))
-        if range_mode not in ("spec", "empirical_max", "holdout"):
+        if range_mode not in ("spec", "empirical_max", "holdout", "finite_population"):
             range_mode = "spec"
         self._range_mode = range_mode
         if self.config.get("output_bounds") is not None:
@@ -344,8 +344,12 @@ class GASBayesSHAP:
             L, U = heuristic_output_bounds(self.oracle.E_base, v_N, delta_total)
             R_delta_res = 4.0 * (U - L)
             heuristic_bounds = True
-        # empirical range modes are approximations -> never rigorous
-        if range_mode != "spec":
+        # heuristic range modes are approximations -> never rigorous; the
+        # finite-population mode is rigorous at the realised coverage level
+        # 1 - delta2 - delta1 (Theorem E): its range is the *observed support*
+        # of a finite-population marginal, whose unobserved part is charged to
+        # the coupon-collector budget delta1 (see _stage3_assemble).
+        if range_mode not in ("spec", "finite_population"):
             heuristic_bounds = True
         self.state.extra.update({"L": float(L), "U": float(U), "R_delta_res": float(R_delta_res)})
         self._range_override = None  # set after the residual pilot
@@ -911,6 +915,26 @@ class GASBayesSHAP:
         n_gp_pred = len(self._gp_predictions_counter)
         n_res_samp = store.n_records
 
+        # ---- finite-population empirical-range accounting (Theorem E) ---- #
+        # For range_mode="finite_population" the certified width uses the
+        # observed support of each stratum's residual marginal; the
+        # probability that the true support max remains unobserved is charged
+        # to the coupon-collector budget delta1 = sum_{i,s} (1-1/N_s)^n_{i,s},
+        # so the realised simultaneous coverage level is 1 - delta_cs - delta1
+        # with delta_cs <= delta/2 (the Theorem-B anytime split) and
+        # delta1 <= delta/2 for the nominal level 1 - delta.
+        fp_delta1 = None
+        fp_level = None
+        fp_at_level = None
+        if getattr(self, "_range_mode", "spec") == "finite_population":
+            from ..certification.empirical_range import (
+                finite_population_coupon_delta1,
+                finite_population_coverage_level,
+            )
+            fp_delta1 = finite_population_coupon_delta1(store, M)
+            fp_level = finite_population_coverage_level(fp_delta1, delta2=0.5 * delta)
+            fp_at_level = bool(fp_delta1 <= 0.5 * delta)
+
         rigorous = (not heuristic_bounds) and all_finite
         status, status_detail = _compose_status(
             converged=converged,
@@ -978,6 +1002,11 @@ class GASBayesSHAP:
                 "R_delta_res_spec": float(self.state.extra.get("R_delta_res", 4.0)),
                 "R_delta_res_effective": float(self.state.extra.get("R_delta_res_eff",
                                                 self.state.extra.get("R_delta_res", 4.0))),
+                "finite_population_delta1": (None if fp_delta1 is None
+                                             else float(fp_delta1)),
+                "finite_population_coverage_level": (None if fp_level is None
+                                                     else float(fp_level)),
+                "finite_population_at_level_delta": bool(fp_at_level),
                 "cache_hit_rate": self._cache.hit_rate() if self._cache is not None else 0.0,
             },
         )

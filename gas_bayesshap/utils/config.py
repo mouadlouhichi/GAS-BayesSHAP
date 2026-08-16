@@ -48,7 +48,9 @@ DEFAULTS: Dict[str, Any] = {
     "numerical_tol": 1e-10,
     "finite_check": True,
     # opt-in empirical residual-range tightening (review task #2)
-    # "spec" | "empirical_max" | "holdout"  (non-spec => heuristic bounds)
+    # "spec" | "finite_population" (rigorous at realised level 1-delta2-delta1,
+    # Theorem E) | "empirical_max" | "holdout" (non-spec, non-finite =>
+    # heuristic bounds flagged range_bound_is_heuristic=True)
     "range_mode": "spec",
     "range_safety_factor": 2.0,
     # --- validation hooks ---

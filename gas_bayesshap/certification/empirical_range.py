@@ -6,13 +6,32 @@ for a good GP surrogate the residual ``|v(S) - m_b(S)|`` is far smaller than
 width.  This module provides **opt-in** tighter range modes:
 
 ``spec`` (default)
-    ``R_eff = 4(U - L)`` — the rigorous, unchanged guarantee.
+    ``R_eff = 4(U - L)`` — the rigorous, unchanged anytime guarantee at the
+    nominal level ``1 - delta``.
 
-``empirical_max``
+``finite_population``  (**rigorous**, Theorem E / E' in the paper)
+    ``R_eff = 2 * max|observed residual|`` per stratum, i.e. the observed
+    support of the residual marginal.  This is *not* an approximation: the
+    residual marginal for cell ``(i, s)`` is an iid uniform draw from the
+    **finite population** of ``C(M-1, s)`` pairs ``{T, T u {i}}`` with
+    ``|T| = s``, so the probability that the support-maximising pair remains
+    unobserved after ``n_{i,s}`` draws is exactly ``(1 - 1/N_{i,s})**n``
+    (coupon-collector bound).  The certificate therefore holds at the
+    *realised* level ``1 - delta2 - delta1`` with
+    ``delta1 = sum_{i,s} (1 - 1/C(M-1,s))**n_{i,s}``, which reaches the
+    nominal level ``1 - delta`` once the coupon collector has seen the
+    extreme coalitions (``n_{i,s} >= log(M(delta-delta2))/log(1/(1-1/N))``).
+    Reported via ``finite_population_delta1`` /
+    ``finite_population_coverage_level``; ``range_bound_is_heuristic`` is
+    ``False`` for this mode.
+
+``empirical_max``  (**heuristic**)
     ``R_eff = factor * max_i |observed residual|`` with a small-sample safety
-    factor.  **Approximate**: the observed max underestimates the true
-    support, so the anytime (1-delta) guarantee is NOT formally preserved.
-    Must be flagged ``range_bound_is_heuristic = True`` in the result.
+    factor.  **Approximate**: for a *generic* (non-finite) population the
+    observed max can underestimate the true support by an arbitrary amount
+    (see the impossibility remark in the paper), so the anytime (1-delta)
+    guarantee is NOT formally preserved.  Flagged
+    ``range_bound_is_heuristic = True``.
 
 ``holdout``
     ``R_eff = 2 * u_holdout`` where ``u_holdout`` is an upper bound on the
@@ -33,6 +52,59 @@ import math
 from typing import Optional
 
 import numpy as np
+
+
+def population_size(M: int, s: int) -> int:
+    """Number of distinct pairs ``{T, T u {i}}`` with ``|T| = s``.
+
+    The residual marginal of cell ``(i, s)`` is an iid uniform draw from this
+    finite population: the add-one path draws ``T`` with ``|T| = s`` and the
+    remove-one path draws ``T`` with ``|T| = s`` (via ``S' = T u {i}``), both
+    uniformly over the ``C(M-1, s)`` choices of ``T`` not containing ``i``.
+    """
+    if s < 0 or s > M - 1:
+        return 1
+    return int(math.comb(M - 1, s))
+
+
+def finite_population_coupon_delta1(store, M: int) -> float:
+    """Realised coupon-collector failure budget ``delta1`` (Theorem E).
+
+    ``delta1 = sum_{i, s interior} (1 - 1/N_{i,s})^{n_{i,s}}`` where
+    ``N_{i,s} = C(M-1, s)`` is the finite-population size of cell ``(i, s)``
+    and ``n_{i,s}`` is the number of residual draws recorded for that cell.
+    This is an upper bound on the probability that any support-maximising
+    pair remains unobserved at the time the certificate is produced, so the
+    empirical-range certificate is valid at level ``1 - delta2 - delta1``.
+    """
+    total = 0.0
+    for s in range(1, M - 1):
+        N_s = population_size(M, s)
+        if N_s <= 1:
+            continue
+        for i in range(M):
+            n = store.count(i, s)
+            if n > 0:
+                total += (1.0 - 1.0 / N_s) ** n
+    return float(total)
+
+
+def finite_population_coverage_level(delta1: float, delta2: float = 0.05) -> float:
+    """Realised simultaneous coverage level ``1 - delta2 - delta1``."""
+    return float(max(0.0, 1.0 - delta2 - delta1))
+
+
+def coupon_threshold(M: int, s: int, budget_delta1: float) -> int:
+    """Deterministic sample count needed so the cell's coupon term is
+    ``<= budget_delta1`` (used by the anytime Theorem E')."""
+    N_s = population_size(M, s)
+    if N_s <= 1:
+        return 0
+    if budget_delta1 <= 0 or budget_delta1 >= 1:
+        return 0
+    if 1.0 - 1.0 / N_s <= budget_delta1:
+        return 1
+    return int(math.ceil(math.log(budget_delta1) / math.log(1.0 - 1.0 / N_s)))
 
 
 def empirical_max_range(
@@ -96,7 +168,13 @@ def per_stratum_ranges(
     """Per-stratum effective residual range R_eff[s] (s = 0..M-1).
 
     ``mode="spec"`` -> every stratum uses ``spec_range`` (rigorous).
-    ``mode="empirical_max"`` -> stratum range from observed |residual| max.
+    ``mode="finite_population"`` -> stratum range ``2 * max|observed
+    residual|`` (rigorous *at the realised level* ``1 - delta2 - delta1``,
+    see :func:`finite_population_coupon_delta1`; with the default
+    ``safety_factor=2.0`` the range is exactly twice the observed max, the
+    rigorous support bound once the support max is observed).
+    ``mode="empirical_max"`` -> ``safety_factor * max|observed residual|``
+    (heuristic, flagged).
     ``mode="holdout"`` -> falls back to empirical_max per stratum (the true
     holdout variant is exposed as :func:`holdout_surrogate_error_bound`).
     """

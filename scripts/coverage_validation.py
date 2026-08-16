@@ -32,6 +32,8 @@ def main() -> int:
     p.add_argument("--delta", type=float, default=0.05)
     p.add_argument("--max-budget", type=int, default=300)
     p.add_argument("--seed0", type=int, default=0)
+    p.add_argument("--range-mode", type=str, default="spec",
+                   choices=["spec", "finite_population", "empirical_max"])
     args = p.parse_args()
 
     # exact ground truth for the calibration game (M=3)
@@ -44,16 +46,20 @@ def main() -> int:
     )
 
     phis, widths, costs = [], [], []
+    d1s, levels = [], []
     for trial in range(args.trials):
         eng = GASBayesSHAP(model_cal, np.zeros((3, args.M)),
                            output_bounds=(-2.0, 5.0),
                            rng=np.random.RandomState(args.seed0 + trial),
-                           config=ENGINE_CONFIG)
+                           config={**ENGINE_CONFIG, "range_mode": args.range_mode})
         r = eng.explain(np.ones(args.M), epsilon=args.epsilon, delta=args.delta,
                         max_budget=args.max_budget)
         phis.append(r["shapley_values"])
         widths.append(r["certified_projected_widths"])
         costs.append(r["num_coalition_evals"])
+        if args.range_mode == "finite_population":
+            d1s.append(r.get("finite_population_delta1") or 0.0)
+            levels.append(r.get("finite_population_coverage_level") or 1.0)
 
     rep = coverage_report(phis, widths, phi_true)
     print("=== Coverage validation ===")
@@ -61,6 +67,9 @@ def main() -> int:
         print(f"  {k:24s}: {v:.4f}" if isinstance(v, float) else f"  {k:24s}: {v}")
     print(f"  {'oracle_query_cost (mean)':24s}: {np.mean(costs):.1f}")
     print(f"  {'oracle_query_cost (max)':24s}: {np.max(costs)}")
+    if args.range_mode == "finite_population":
+        print(f"  {'finite_population_delta1 (mean)':24s}: {np.mean(d1s):.4f}")
+        print(f"  {'realised coverage level (mean)':24s}: {np.mean(levels):.4f}")
     return 0
 
 
