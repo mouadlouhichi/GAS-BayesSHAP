@@ -83,14 +83,17 @@ def test_coupon_delta1_monotone_in_counts():
         finite_population_coupon_delta1, population_size,
     )
     store = StratumStore(4)
-    # one stratum s=1, population C(3,1)=3; n=10 -> (2/3)**10
+    # M=4 -> interior strata s=1 (population C(3,1)=3) and s=2 (C(3,2)=3).
+    # s=1 gets n=10 per feature -> (2/3)**10 each; s=2 has n=0 -> each
+    # contributes (1-1/3)^0 = 1 (missing cells dominate delta1).
     for i in range(4):
         for _ in range(10):
             store.append(i, 1, np.zeros(4, dtype=bool), "add_one", 0.1, 0)
     d1 = finite_population_coupon_delta1(store, 4)
-    expected = 4 * (1.0 - 1.0 / 3.0) ** 10
+    expected = 4 * (1.0 - 1.0 / 3.0) ** 10 + 4 * 1.0
     assert abs(d1 - expected) < 1e-9
-    # more samples -> smaller delta1
+    # more samples -> smaller delta1 (the s=2 cells are still missing, but
+    # the s=1 contribution shrinks)
     store2 = StratumStore(4)
     for i in range(4):
         for _ in range(20):

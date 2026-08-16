@@ -110,7 +110,8 @@ def make_proba_fn(m, feat_names, cluster_id):
 # --------------------------------------------------------------------------- #
 # Per-instance evaluation
 # --------------------------------------------------------------------------- #
-def evaluate_instance(model_fn, X, x0, B, eps, budget, n_active=10, seed=1301):
+def evaluate_instance(model_fn, X, x0, B, eps, budget, n_active=10, seed=1301,
+                       range_mode="spec"):
     """Exact + GAS + KernelSHAP + SamplingSHAP for one instance."""
     bg = X.sample(B, random_state=seed).values
     oracle = CoalitionOracle(model_fn, bg, output_bounds=(0.0, 1.0),
@@ -125,7 +126,8 @@ def evaluate_instance(model_fn, X, x0, B, eps, budget, n_active=10, seed=1301):
     eng = GASBayesSHAP(model_fn, bg, output_bounds=(0.0, 1.0),
                        rng=np.random.RandomState(seed),
                        config={"checkpoint_enabled": False, "cache_enabled": True,
-                               "persist_cache": False, "log_level": "NONE"})
+                               "persist_cache": False, "log_level": "NONE",
+                               "range_mode": range_mode})
     r = eng.explain(x0, epsilon=eps, delta=0.05, max_budget=budget,
                     n_pilot=3, n_active_steps=n_active)
     phi_gas = np.asarray(r["shapley_values"])
@@ -178,7 +180,7 @@ feat_names_ = None
 # --------------------------------------------------------------------------- #
 # Dataset experiment
 # --------------------------------------------------------------------------- #
-def run_dataset(name, X, feat_names, n_clusters, eps, budget, N):
+def run_dataset(name, X, feat_names, n_clusters, eps, budget, N, range_mode="spec"):
     global m_, feat_names_
     m_, feat_names_ = build_surrogate(X, n_clusters, feat_names)[:2]
     m, X_te, acc, f1 = build_surrogate(X, n_clusters, feat_names)
@@ -190,7 +192,8 @@ def run_dataset(name, X, feat_names, n_clusters, eps, budget, N):
         cid = i % n_clusters  # rotate over clusters
         fn = make_proba_fn(m, feat_names, cid)
         try:
-            res = evaluate_instance(fn, X, x0, B=64, eps=eps, budget=budget, seed=1301 + i)
+            res = evaluate_instance(fn, X, x0, B=64, eps=eps, budget=budget,
+                                     seed=1301 + i, range_mode=range_mode)
             res.update({"instance": i, "cluster": cid})
             rows.append(res)
             print(f"  instance {i}: gas_rmse={res['rmse_gas']:.5f} "
@@ -204,7 +207,7 @@ def run_dataset(name, X, feat_names, n_clusters, eps, budget, N):
     df = pd.DataFrame(rows)
     summary = {
         "dataset": name, "n_instances": len(df), "clusters": n_clusters,
-        "eps": eps, "budget": budget,
+        "eps": eps, "budget": budget, "range_mode": range_mode,
         "rmse_gas_mean": df["rmse_gas"].mean(), "rmse_gas_std": df["rmse_gas"].std(),
         "rmse_kernel_mean": df["rmse_kernel"].mean(),
         "rmse_mc_mean": df["rmse_mc"].mean(),
@@ -217,8 +220,9 @@ def run_dataset(name, X, feat_names, n_clusters, eps, budget, N):
         "converged_fraction": df["converged"].mean(),
         "status_counts": df["status"].value_counts().to_dict(),
     }
-    df.to_csv(out(f"{name}_n{len(df)}_budget{budget}_instances.csv"), index=False)
-    pd.DataFrame([summary]).to_csv(out(f"{name}_n{len(df)}_budget{budget}_summary.csv"), index=False)
+    sfx = "" if range_mode == "spec" else f"_range{range_mode}"
+    df.to_csv(out(f"{name}_n{len(df)}_budget{budget}{sfx}_instances.csv"), index=False)
+    pd.DataFrame([summary]).to_csv(out(f"{name}_n{len(df)}_budget{budget}{sfx}_summary.csv"), index=False)
     print(f"[{name}] summary: {json.dumps(summary, indent=2, default=str)}")
     return df, summary
 
@@ -226,7 +230,7 @@ def run_dataset(name, X, feat_names, n_clusters, eps, budget, N):
 # --------------------------------------------------------------------------- #
 # Matched-budget curves
 # --------------------------------------------------------------------------- #
-def run_curves(name, X, feat_names, n_clusters, Ks, N=10):
+def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
     global m_, feat_names_
     m_, feat_names_ = build_surrogate(X, n_clusters, feat_names)[:2]
     m, X_te, acc, f1 = build_surrogate(X, n_clusters, feat_names)
@@ -242,7 +246,8 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10):
                 eng = GASBayesSHAP(fn, bg, output_bounds=(0.0, 1.0),
                                    rng=np.random.RandomState(1301 + i),
                                    config={"checkpoint_enabled": False, "cache_enabled": True,
-                                           "persist_cache": False, "log_level": "NONE"})
+                                           "persist_cache": False, "log_level": "NONE",
+                                           "range_mode": range_mode})
                 r = eng.explain(x0, epsilon=0.05, delta=0.05, max_budget=K,
                                 n_pilot=3, n_active_steps=10)
                 phi_exact = exact_shapley_from_values(
@@ -273,7 +278,8 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10):
 # --------------------------------------------------------------------------- #
 # Width-vs-budget diagnostic (GAS only; fast - no exact/KernelSHAP/MC)
 # --------------------------------------------------------------------------- #
-def run_widths(name, X, feat_names, n_clusters, budgets, N=5, eps=0.05):
+def run_widths(name, X, feat_names, n_clusters, budgets, N=5, eps=0.05,
+                    range_mode="spec"):
     global m_, feat_names_
     m_, feat_names_ = build_surrogate(X, n_clusters, feat_names)[:2]
     m, X_te, acc, f1 = build_surrogate(X, n_clusters, feat_names)
@@ -290,7 +296,8 @@ def run_widths(name, X, feat_names, n_clusters, budgets, N=5, eps=0.05):
                 eng = GASBayesSHAP(fn, bg, output_bounds=(0.0, 1.0),
                                    rng=np.random.RandomState(1301 + i),
                                    config={"checkpoint_enabled": False, "cache_enabled": True,
-                                           "persist_cache": False, "log_level": "NONE"})
+                                           "persist_cache": False, "log_level": "NONE",
+                                           "range_mode": range_mode})
                 r = eng.explain(x0, epsilon=eps, delta=0.05, max_budget=K,
                                 n_pilot=3, n_active_steps=10)
                 W = np.asarray(r["certified_projected_widths"])
@@ -316,12 +323,14 @@ def run_widths(name, X, feat_names, n_clusters, budgets, N=5, eps=0.05):
 # --------------------------------------------------------------------------- #
 # Tier B (group-lag)
 # --------------------------------------------------------------------------- #
-def run_tier_b(eps, budget, N=10):
+def run_tier_b(eps, budget, N=10, range_mode="spec"):
     df = pd.read_csv(ROOT / "data" / "Beijing_MultiSite_AirQuality.csv")
     st = df["station"].value_counts().index[0]
     X = df[df["station"] == st][FEATURES].dropna().reset_index(drop=True)
     if len(X) > 40000:
-        X = X.sample(40000, random_state=1301).reset_index(drop=True)
+        # contiguous *chronological* window — never sample() before lagging,
+        # which would destroy temporal adjacency (audit finding).
+        X = X.iloc[:40000].reset_index(drop=True)
 
     LAGS = (0, 1, 3, 6, 12, 24)
 
@@ -337,8 +346,11 @@ def run_tier_b(eps, budget, N=10):
     Xs = StandardScaler().fit_transform(X)
     km = KMeans(n_clusters=4, random_state=1301, n_init=10).fit(Xs)
     lab = km.labels_
-    valid = X_lag.index if len(X_lag) else []
-    lag_target = np.asarray(lab)[: len(X_lag)]
+    # Alignment fix: make_lagged drops exactly the first max(LAGS) rows
+    # (all shifts are >= 0, NaN only at the start), so X_lag[i] corresponds
+    # to original time index i + max(LAGS).  Labels must be shifted by the
+    # same offset — never lab[:len(X_lag)] (a 24-hour label shift).
+    lag_target = np.asarray(lab)[max(LAGS): max(LAGS) + len(X_lag)]
     X_tr, X_te, y_tr, y_te = train_test_split(X_lag, lag_target, test_size=0.3,
                                               random_state=1301, stratify=lag_target)
     m = lgb.LGBMClassifier(objective="multiclass", num_class=4, random_state=1301,
@@ -363,7 +375,8 @@ def run_tier_b(eps, budget, N=10):
             phi_exact_g = exact_shapley_from_values(values, spec.M)
             eng = GASBayesSHAP(oracle=oracle, rng=np.random.RandomState(1301 + i),
                                config={"checkpoint_enabled": False, "cache_enabled": True,
-                                       "persist_cache": False, "log_level": "NONE"})
+                                       "persist_cache": False, "log_level": "NONE",
+                                       "range_mode": range_mode})
             r = eng.explain(x0, epsilon=eps, delta=0.05, max_budget=budget,
                             n_pilot=3, n_active_steps=10)
             phi_g = np.asarray(r["shapley_values"])
@@ -382,13 +395,15 @@ def run_tier_b(eps, budget, N=10):
         except Exception as e:
             print(f"  tierB inst {i} FAILED: {str(e)[:120]}")
     d = pd.DataFrame(rows)
-    d.to_csv(out("air_tierB_instances.csv"), index=False)
+    sfx = "" if range_mode == "spec" else f"_range{range_mode}"
+    d.to_csv(out(f"air_tierB{sfx}_instances.csv"), index=False)
     pd.DataFrame([{
         "n_instances": len(d), "rmse_mean": d["rmse"].mean(),
         "simultaneous_coverage_rate": d["sim_cov"].mean(),
         "sign_certified_fraction": d["sign_cert"].mean(),
         "mean_width": d["mean_width"].mean(), "gas_evals_mean": d["gas_evals"].mean(),
-    }]).to_csv(out("air_tierB_summary.csv"), index=False)
+        "range_mode": range_mode,
+    }]).to_csv(out(f"air_tierB{sfx}_summary.csv"), index=False)
     print(f"[tierB] summary: rmse={d['rmse'].mean():.5f} sim_cov={d['sim_cov'].mean():.2f} "
           f"sign_cert={d['sign_cert'].mean():.3f} mean_width={d['mean_width'].mean():.2f}")
     return d
@@ -401,32 +416,37 @@ def main():
     ap.add_argument("--eps", type=float, default=0.05)
     ap.add_argument("--budget", type=int, default=3000)
     ap.add_argument("--only", choices=["wine", "air", "curves", "widths", "tierb", "all"], default="all")
+    ap.add_argument("--range-mode", choices=["spec", "finite_population", "empirical_max"],
+                    default="spec", help="certificate range mode (default spec)")
     args = ap.parse_args()
+    rm = args.range_mode
 
     t0 = time.time()
     if args.only in ("wine", "all"):
         Xw, _ = load_wine()
         run_dataset("wine", Xw, WINE_FEATURES, n_clusters=2, eps=args.eps,
-                    budget=args.budget, N=args.n)
+                    budget=args.budget, N=args.n, range_mode=rm)
     if args.only in ("air", "all"):
         Xa, _ = load_air_station(n_clusters=4)
         run_dataset("air", Xa, FEATURES, n_clusters=4, eps=args.eps,
-                    budget=args.budget, N=args.n)
+                    budget=args.budget, N=args.n, range_mode=rm)
     if args.only in ("curves", "all"):
         Xw, _ = load_wine()
-        run_curves("wine", Xw, WINE_FEATURES, n_clusters=2, Ks=[128, 256, 512, 1024, 2048], N=8)
+        run_curves("wine", Xw, WINE_FEATURES, n_clusters=2, Ks=[128, 256, 512, 1024, 2048], N=8,
+                   range_mode=rm)
         Xa, _ = load_air_station(n_clusters=4)
-        run_curves("air", Xa, FEATURES, n_clusters=4, Ks=[128, 256, 512, 1024, 2048], N=8)
+        run_curves("air", Xa, FEATURES, n_clusters=4, Ks=[128, 256, 512, 1024, 2048], N=8,
+                   range_mode=rm)
     if args.only in ("widths", "all"):
         Xw, _ = load_wine()
         run_widths("wine", Xw, WINE_FEATURES, n_clusters=2,
-                   budgets=[500, 1000, 2000, 4000, 8000], N=5, eps=args.eps)
+                   budgets=[500, 1000, 2000, 4000, 8000], N=5, eps=args.eps, range_mode=rm)
         Xa, _ = load_air_station(n_clusters=4)
         run_widths("air", Xa, FEATURES, n_clusters=4,
-                   budgets=[500, 1000, 2000, 4000, 8000], N=5, eps=args.eps)
+                   budgets=[500, 1000, 2000, 4000, 8000], N=5, eps=args.eps, range_mode=rm)
     if args.only in ("tierb", "all"):
         # N is user-controlled (--n); previously capped at 10 instances.
-        run_tier_b(eps=args.eps, budget=args.budget, N=args.n)
+        run_tier_b(eps=args.eps, budget=args.budget, N=args.n, range_mode=rm)
 
     # copy to main_results with prefixes
     MAIN.mkdir(parents=True, exist_ok=True)

@@ -933,9 +933,18 @@ class GASBayesSHAP:
             )
             fp_delta1 = finite_population_coupon_delta1(store, M)
             fp_level = finite_population_coverage_level(fp_delta1, delta2=0.5 * delta)
+            # nominal level 1 - delta requires the deterministic coupon
+            # thresholds (Corollary E): sum of per-cell (1-1/N_s)^n <= delta/2
+            # while the anytime CS consumes the other delta/2.
             fp_at_level = bool(fp_delta1 <= 0.5 * delta)
 
+        # For the finite-population mode the range is rigorous at the
+        # realised level 1 - delta2 - delta1, but `certificate_is_rigorous`
+        # (nominal 1-delta) additionally requires the coupon collector to
+        # have completed: fp_delta1 <= delta/2 (Corollary E).
         rigorous = (not heuristic_bounds) and all_finite
+        if getattr(self, "_range_mode", "spec") == "finite_population":
+            rigorous = rigorous and bool(fp_at_level)
         status, status_detail = _compose_status(
             converged=converged,
             rigorous=rigorous,
@@ -1007,6 +1016,8 @@ class GASBayesSHAP:
                 "finite_population_coverage_level": (None if fp_level is None
                                                      else float(fp_level)),
                 "finite_population_at_level_delta": bool(fp_at_level),
+                "certificate_at_nominal_level": bool(fp_at_level) if getattr(
+                    self, "_range_mode", "spec") == "finite_population" else None,
                 "cache_hit_rate": self._cache.hit_rate() if self._cache is not None else 0.0,
             },
         )

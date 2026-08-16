@@ -39,9 +39,12 @@ def main() -> int:
     ap.add_argument("--budgets", default="2000,8000,30000,100000",
                     help="comma-separated max_budget values")
     ap.add_argument("--seed", type=int, default=1301)
+    ap.add_argument("--range-mode", default="spec",
+                    choices=["spec", "finite_population", "empirical_max"])
     args = ap.parse_args()
     budgets = [int(b) for b in args.budgets.split(",")]
     seed = args.seed
+    rm = args.range_mode
 
     df = pd.read_csv(ROOT / "data" / "winequality-white.csv", sep=";")
     X = df[FEAT].dropna().reset_index(drop=True)
@@ -71,29 +74,44 @@ def main() -> int:
         t0 = time.time()
         eng = GASBayesSHAP(fn, bg, output_bounds=(0.0, 1.0), rng=np.random.RandomState(seed),
                            config={"checkpoint_enabled": False, "cache_enabled": True,
-                                   "persist_cache": False, "log_level": "NONE"})
+                                   "persist_cache": False, "log_level": "NONE",
+                                   "range_mode": rm})
         r = eng.explain(x0, epsilon=0.02, delta=0.05, max_budget=K, n_pilot=3, n_active_steps=10)
         W = np.asarray(r["certified_projected_widths"])
         phi = np.asarray(r["shapley_values"])
         err = float(np.max(np.abs(phi - phi_exact)))
+        sc = np.abs(phi) > W
+        # validation against exact ground truth: certified sign must equal the
+        # exact sign and |phi_exact| must exceed the certified width (no
+        # boundary/zero-attribution cases certified).
+        sc_ok = int(np.all(np.sign(phi[sc]) == np.sign(phi_exact[sc]))) if sc.any() else 1
+        sc_min_margin = float(np.min(np.abs(phi_exact[sc]) - W[sc])) if sc.any() else float("nan")
         rows.append({
             "budget": K, "status": r["status"], "converged": r["converged"],
+            "range_mode": rm,
             "mean_width": float(W.mean()), "max_width": float(W.max()),
-            "sign_certified_fraction": float(np.mean(np.abs(phi) > W)),
+            "sign_certified_fraction": float(np.mean(sc)),
+            "n_sign_certified": int(sc.sum()),
+            "signs_match_exact": sc_ok,
+            "min_exact_margin": sc_min_margin,
             "max_err_vs_exact": err, "elapsed_s": round(time.time() - t0, 1),
         })
         print(f"K={K:>7}: {r['status']:15s} meanW={W.mean():.3f} sign_cert="
-              f"{np.mean(np.abs(phi) > W):.3f} max_err={err:.5f} ({rows[-1]['elapsed_s']:.0f}s)")
+              f"{np.mean(sc):.3f} ({int(sc.sum())} feats) signs_ok={sc_ok} "
+              f"max_err={err:.5f} ({rows[-1]['elapsed_s']:.0f}s)")
 
     out_dir = ROOT / "results" / "paper_experiments"
     out_dir.mkdir(parents=True, exist_ok=True)
     d = pd.DataFrame(rows)
-    d.to_csv(out_dir / "width_probe.csv", index=False)
+    sfx = "" if rm == "spec" else f"_{rm}"
+    d.to_csv(out_dir / f"width_probe{sfx}.csv", index=False)
     # copy to main_results
     (ROOT / "main_results").mkdir(parents=True, exist_ok=True)
     import shutil
-    shutil.copy2(out_dir / "width_probe.csv", ROOT / "main_results" / "paper_width_probe.csv")
-    print("saved results/paper_experiments/width_probe.csv + main_results/paper_width_probe.csv")
+    shutil.copy2(out_dir / f"width_probe{sfx}.csv",
+                 ROOT / "main_results" / f"paper_width_probe{sfx}.csv")
+    print(f"saved results/paper_experiments/width_probe{sfx}.csv "
+          f"+ main_results/paper_width_probe{sfx}.csv")
     return 0
 
 

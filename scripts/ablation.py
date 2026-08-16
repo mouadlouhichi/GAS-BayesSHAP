@@ -160,12 +160,18 @@ def run_ablation(name, K, n_inst, clusters):
         sig = np.ones((M, M)) * 0.5
         t2, ev2 = tier2_neyman_mc(oracle, x0, M, K, sig, np.random.RandomState(1301 + i))
 
+        W4 = np.asarray(r4["certified_projected_widths"])
+        phi4 = np.asarray(r4["shapley_values"])
+        err4 = np.abs(phi4 - phi_exact)
         rows.append({
             "instance": i, "cluster": cid,
             "tier1_uniform_rmse": rmse(t1, phi_exact), "tier1_evals": ev1,
             "tier2_neyman_rmse": rmse(t2, phi_exact), "tier2_evals": ev2,
             "tier3_gp_rmse": r_gp, "tier3_evals": gp_only["num_coalition_evals"],
             "tier4_full_rmse": r_full, "tier4_evals": r4["num_coalition_evals_this_call"],
+            "tier4_mean_width": float(W4.mean()),
+            "tier4_sim_cov": float(np.all(err4 <= W4)),
+            "tier4_sign_cert": float(np.mean(np.abs(phi4) > W4)),
         })
         print(f"  inst {i}: uniform={rows[-1]['tier1_uniform_rmse']:.5f} "
               f"neyman={rows[-1]['tier2_neyman_rmse']:.5f} "
@@ -182,6 +188,9 @@ def run_ablation(name, K, n_inst, clusters):
         "tier3_gp_rmse_mean": d.tier3_gp_rmse.mean(),
         "tier4_full_rmse_mean": d.tier4_full_rmse.mean(),
         "tier4_evals_mean": d.tier4_evals.mean(),
+        "tier4_mean_width": d.tier4_mean_width.mean(),
+        "tier4_sim_cov_rate": d.tier4_sim_cov.mean(),
+        "tier4_sign_cert_fraction": d.tier4_sign_cert.mean(),
     }
     pd.DataFrame([summ]).to_csv(out / f"ablation_{name}_summary.csv", index=False)
     import shutil

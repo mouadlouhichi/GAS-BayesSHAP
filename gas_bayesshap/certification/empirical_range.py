@@ -15,15 +15,17 @@ width.  This module provides **opt-in** tighter range modes:
     residual marginal for cell ``(i, s)`` is an iid uniform draw from the
     **finite population** of ``C(M-1, s)`` pairs ``{T, T u {i}}`` with
     ``|T| = s``, so the probability that the support-maximising pair remains
-    unobserved after ``n_{i,s}`` draws is exactly ``(1 - 1/N_{i,s})**n``
-    (coupon-collector bound).  The certificate therefore holds at the
-    *realised* level ``1 - delta2 - delta1`` with
-    ``delta1 = sum_{i,s} (1 - 1/C(M-1,s))**n_{i,s}``, which reaches the
-    nominal level ``1 - delta`` once the coupon collector has seen the
-    extreme coalitions (``n_{i,s} >= log(M(delta-delta2))/log(1/(1-1/N))``).
-    Reported via ``finite_population_delta1`` /
-    ``finite_population_coverage_level``; ``range_bound_is_heuristic`` is
-    ``False`` for this mode.
+    unobserved after ``n_{i,s}`` draws is *at most* ``(1 - 1/N_{i,s})**n``
+    (coupon-collector bound; equality only for a unique maximiser).  The
+    certificate therefore holds at the *realised* level ``1 - delta2 -
+    delta1`` with ``delta1 = sum_{i,s} (1 - 1/C(M-1,s))**n_{i,s}``, which
+    reaches the nominal level ``1 - delta`` once the coupon collector has
+    seen the extreme coalitions (``n_{i,s} >= log(M(delta-delta2)) /
+    log(1/(1-1/N))``).  Reported via ``finite_population_delta1`` /
+    ``finite_population_coverage_level`` / ``certificate_at_nominal_level``;
+    ``range_bound_is_heuristic`` is ``False`` for this mode (the residual
+    bound is valid at the realised level; the *nominal* level is reached
+    only when the deterministic coupon thresholds hold).
 
 ``empirical_max``  (**heuristic**)
     ``R_eff = factor * max_i |observed residual|`` with a small-sample safety
@@ -73,9 +75,13 @@ def finite_population_coupon_delta1(store, M: int) -> float:
     ``delta1 = sum_{i, s interior} (1 - 1/N_{i,s})^{n_{i,s}}`` where
     ``N_{i,s} = C(M-1, s)`` is the finite-population size of cell ``(i, s)``
     and ``n_{i,s}`` is the number of residual draws recorded for that cell.
-    This is an upper bound on the probability that any support-maximising
-    pair remains unobserved at the time the certificate is produced, so the
-    empirical-range certificate is valid at level ``1 - delta2 - delta1``.
+    A cell with ``n = 0`` observations contributes ``(1 - 1/N)^0 = 1`` (the
+    support-maximising pair is unobserved with certainty).  This is an upper
+    bound (not an equality) on the probability that any support-maximising
+    pair remains unobserved at the time the certificate is produced: if
+    ``m`` coalitions share the maximum absolute residual, the failure
+    probability is ``(1 - m/N)^n <= (1 - 1/N)^n``.  The realised coverage
+    level is therefore ``1 - delta2 - delta1`` (lower bound).
     """
     total = 0.0
     for s in range(1, M - 1):
@@ -84,8 +90,7 @@ def finite_population_coupon_delta1(store, M: int) -> float:
             continue
         for i in range(M):
             n = store.count(i, s)
-            if n > 0:
-                total += (1.0 - 1.0 / N_s) ** n
+            total += (1.0 - 1.0 / N_s) ** n
     return float(total)
 
 

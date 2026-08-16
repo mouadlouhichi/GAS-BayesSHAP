@@ -256,6 +256,24 @@ $\delta_{\mathrm{CS}}\le\delta_2$ the total failure probability is at most
 $\delta$.
 \end{proof}
 
+\begin{remark}[Optional stopping]
+\label{rem:stopping}
+The realised-level statement of Theorem~\ref{thm:E} holds at every fixed
+sample count $n$; at a data-dependent stopping time $\tau$ the coupon term
+$\delta_1(\tau)=\sum_{i,s}(1-1/N_s)^{n_{i,s}(\tau)}$ is a random quantity
+whose distribution depends on the sampling history.  The level
+$1-\delta_2-\delta_1(\tau)$ is therefore a \emph{conditional-on-history}
+statement, not an anytime one.  Two routes give an anytime statement:
+(i)~restart-style union over a ladder of deterministic thresholds
+($\delta_1(\tau)\le\alpha$ must be checked on a pre-announced grid), or
+(ii)~the deterministic threshold route of
+Corollary~\ref{cor:E}, which we adopt: the estimator is allowed to report
+\emph{nominal} certification only when the coupon thresholds are met for
+every interior cell; otherwise it reports the realised level explicitly and
+the status is not ``certified''.  This is exactly the
+``certificate\_at\_nominal\_level'' flag in the implementation.
+\end{remark}
+
 Theorem~\ref{thm:E} is what distinguishes the \emph{finite-population} range
 mode of GAS-BayesSHAP from the heuristic \emph{empirical-max} mode: the
 widths are identical ($\hat R_n=2\max|r|$), but the former \emph{charges}
@@ -285,6 +303,17 @@ coalition evals, $N=50$ instances per dataset (seeded), pilot $n_{\mathrm
 pil}=3$, $10$ active-GP steps; RMSE vs exact, simultaneous coverage
 ($\|\hat\phi-\phi^*\|_\infty\le W^{\mathrm{proj}}$), marginal coverage,
 sign-certified fraction, coalition evals.
+\textbf{Matched-budget honesty.}  Budgets are \emph{nominal}:
+``max\_budget'' bounds GAS's Stage-2 coalition evaluations (plus a fixed
+Stage-1 design and singleton init), while KernelSHAP's ``nsamples'' is the
+number of coalition samples it draws; the two do not count identical
+oracle/model calls.  The matched-budget tables are therefore labelled
+\emph{nominal-budget} comparisons, and the follow-up curves report
+instrumented per-method call counts.
+\textbf{Temporal games.}  The Tier-B group-lag game uses a contiguous
+chronological window with shifted label alignment ($y_{t+24}$ matched to
+features at $t$); the committed Tier-B numbers reflect this corrected
+protocol.
 
 \subsection{RQ1: attribution fidelity at N=50}\label{sec:rq1}
 \begin{table}[t]\centering\small
