@@ -1,0 +1,6 @@
+budget,status,converged,range_mode,mean_width,max_width,sign_certified_fraction,n_sign_certified,signs_match_exact,min_exact_margin,max_err_vs_exact,elapsed_s,delta1,realised_level,at_nominal_level,certificate_is_rigorous
+2000,BUDGET_EXHAUSTED,False,spec,13.388047740462065,17.74902606142846,0.0,0,1,,0.0026901772735192786,63.6,,,False,True
+8000,BUDGET_EXHAUSTED,False,spec,3.8359037342938347,5.157770398226179,0.0,0,1,,0.0010044199148135646,96.4,,,False,True
+10000,BUDGET_EXHAUSTED,False,spec,3.1388625846216964,4.209159731226861,0.0,0,1,,0.0006077245334697619,100.8,,,False,True
+30000,BUDGET_EXHAUSTED,False,spec,1.1872696578174768,1.5910197704168847,0.0,0,1,,0.0006626264148160733,106.5,,,False,True
+100000,BUDGET_EXHAUSTED,False,spec,0.4004993685867823,0.5385142788076214,0.0,0,1,,0.000141655132887053,124.5,,,False,True

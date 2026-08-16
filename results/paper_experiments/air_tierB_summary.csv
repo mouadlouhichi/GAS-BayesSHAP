@@ -1,2 +1,2 @@
-n_instances,rmse_mean,simultaneous_coverage_rate,sign_certified_fraction,mean_width,gas_evals_mean
-20,0.0020181352613621454,1.0,0.0,9.020058448488372,1446.45
+n_instances,rmse_mean,simultaneous_coverage_rate,sign_certified_fraction,mean_width,gas_evals_mean,range_mode
+20,0.0019489549562000895,1.0,0.0,9.195498261867588,1434.35,spec

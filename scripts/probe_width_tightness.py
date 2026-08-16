@@ -95,10 +95,17 @@ def main() -> int:
             "signs_match_exact": sc_ok,
             "min_exact_margin": sc_min_margin,
             "max_err_vs_exact": err, "elapsed_s": round(time.time() - t0, 1),
+            "delta1": r.get("finite_population_delta1"),
+            "realised_level": r.get("finite_population_coverage_level"),
+            "at_nominal_level": r.get("finite_population_at_level_delta"),
+            "certificate_is_rigorous": bool(r.get("certificate_is_rigorous", False)),
         })
+        extra = "" if rm == "spec" else (
+            f" delta1={rows[-1]['delta1']:.3f} level={rows[-1]['realised_level']:.3f} "
+            f"at_nominal={rows[-1]['at_nominal_level']}")
         print(f"K={K:>7}: {r['status']:15s} meanW={W.mean():.3f} sign_cert="
               f"{np.mean(sc):.3f} ({int(sc.sum())} feats) signs_ok={sc_ok} "
-              f"max_err={err:.5f} ({rows[-1]['elapsed_s']:.0f}s)")
+              f"max_err={err:.5f} ({rows[-1]['elapsed_s']:.0f}s){extra}")
 
     out_dir = ROOT / "results" / "paper_experiments"
     out_dir.mkdir(parents=True, exist_ok=True)
