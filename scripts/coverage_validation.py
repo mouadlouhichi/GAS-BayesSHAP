@@ -58,8 +58,10 @@ def main() -> int:
         widths.append(r["certified_projected_widths"])
         costs.append(r["num_coalition_evals"])
         if args.range_mode == "finite_population":
-            d1s.append(r.get("finite_population_delta1") or 0.0)
-            levels.append(r.get("finite_population_coverage_level") or 1.0)
+            d1 = r.get("finite_population_delta1")
+            d1s.append(d1 if d1 is not None else 0.0)
+            lvl = r.get("finite_population_coverage_level")
+            levels.append(lvl if lvl is not None else 1.0)
 
     rep = coverage_report(phis, widths, phi_true)
     print("=== Coverage validation ===")

@@ -467,10 +467,25 @@ The honest cost of that tightening is the coupon-collector budget: at
 $K=3000$ the realised $\delta_1=\sum_{i,s}(1-1/N_s)^{n_{i,s}}\approx59$,
 so the \emph{realised} coverage level is $0$ — the support-maximising
 coalitions are almost surely unobserved, exactly as the impossibility
-remark (Remark~\ref{rem:imposs}) predicts.  The rigorous statement is the
-frontier itself (Corollary~\ref{cor:E}): with $n_{i,s}\gtrsim
-N_s\ln(M/\delta_1)$ draws per cell the level reaches $1-\delta$, at a total
-cost $K\approx\sum_s N_s\ln(M/\delta_1)(M+1)\approx2\times10^5$ for $M=11$.
+remark (Remark~\ref{rem:imposs}) predicts.
+
+\textbf{Sign certification is achieved under the finite-population mode.}
+On the probe instance (wine, $\varepsilon=0.02$, exact ground truth), the
+finite-population widths at $K\in\{10^4,3\times10^4,10^5\}$ are
+$0.475,0.183,0.064$ (vs spec $3.14,1.19,0.40$, a $6.5\times$ constant
+reduction): the dominant feature ($\phi^*=-0.257$) becomes sign-certified
+at $K\ge3\times10^4$, and every certified sign matches the exact Shapley
+sign with positive margin ($0.168$ at $K=10^5$); no false certifications
+occur at any $K$ (Table~\ref{tab:fp}).  The honest cost is the coupon
+budget: at $K=10^5$ the realised level is $0.372$ ($\delta_1=0.60$), so the
+width is valid at that level, and the \emph{nominal} $1-\delta$
+certificate requires the frontier budget $K\approx2\times10^5$
+(Corollary~\ref{cor:E}).
+
+The rigorous statement is the frontier itself (Corollary~\ref{cor:E}):
+with $n_{i,s}\gtrsim N_s\ln(M/\delta_1)$ draws per cell the level reaches
+$1-\delta$, at a total cost
+$K\approx\sum_s N_s\ln(M/\delta_1)(M+1)\approx2\times10^5$ for $M=11$.
 We validate the mechanism end-to-end on the $M=3$ calibration game, where
 $N_s=2$ and the coupon collector completes within budget: coverage $1.0$ at
 $R=500$, width $2.38$ vs $12.31$ ($5.2\times$), realised level $0.959$
@@ -489,6 +504,10 @@ $M{=}3$, $K{=}300$, $R{=}500$ & Spec & 12.31 & 1.0 & $1-\delta$ \\
 \addlinespace
 Wine $M{=}11$, $K{=}3000$, $N{=}5$ & Spec & 8.75 & 1.0 & $1-\delta$ \\
 & Finite-pop. & 0.94 & 1.0 & $0.0$ (coupon open) \\
+\addlinespace
+Wine $M{=}11$, $K{=}10^5$, $N{=}1$ & Spec & 0.400 & 1.0 & $1-\delta$ \\
+& Finite-pop. & 0.064 & 1.0 & $0.372$ \\
+& & \multicolumn{3}{l}{1 feature sign-certified, signs validated vs exact} \\
 \bottomrule
 \end{tabular}
 \caption{Empirical-range tightening (Theorem~\ref{thm:E}).  Widths are
@@ -496,8 +515,10 @@ $5$--$9\times$ tighter at identical budgets; the realised level
 $1-\delta_2-\delta_1$ is reported honestly.  On the $M{=}3$ game the
 coupon collector completes ($\delta_1{=}0.016$) and the certificate is
 rigorous at level $0.959$; on wine at $K{=}3000$ the support max is almost
-surely unseen ($\delta_1{\approx}59$), so the level-$1-\delta$ certificate
-requires the frontier budget $K\approx2\times10^5$.}
+surely unseen ($\delta_1{\approx}59$); at $K{=}10^5$ the finite-population
+width ($0.064$) falls below the dominant attribution ($|\phi^*|=0.257$)
+and the feature is sign-certified with the certified sign matching the
+exact sign (realised level $0.372$).}
 \label{tab:fp}
 \end{table}
 \begin{figure}[t]\centering

@@ -41,14 +41,24 @@ Information Fusion / Machine Learning (applied framing).
      MC 0.0466); air GAS 0.00186+-0.00117 (Kernel 0.00606, MC 0.0370);
      ~1.43k evals vs exact 2048; sim coverage 1.0; sign_cert 0.
    - RQ2 coverage calibration (R=500): coverage 1.0, finite-width 1.0;
-     finite-population mode: width 2.38 vs 12.31 spec (5.2x), level 0.959.
+     finite-population mode: width 2.38 vs 12.31 spec (5.2x), level 0.959,
+     at_nominal_level fraction 0.782.
+   - RQ2b finite-pop N=50 reruns (spec-vs-fp at standard budget): width
+     ~0.97/1.12 vs 9.15/9.43, same RMSE/coverage, sign_cert 0 at K=3000
+     (fp width still > |phi| ~ 0.26) — honest.
    - RQ3 regime semantics (Spearman driver correlation; named regimes) +
-     Tier-B N=20 macro RMSE 0.00202, sim cov 1.0.
+     Tier-B N=20 (alignment-fixed protocol): macro RMSE 0.00195, sim cov 1.0.
    - RQ5 matched-budget curves (KernelSHAP overtakes at K>=512; GAS wins
-     low-budget <=256: 2.5x at K=128 air).
-   - Ablation (4 tiers): uniform 0.051 / neyman 0.009 / gp 0.081 / full 0.0038.
-   - Baselines: OddSHAP-style log-odds, ShaplEIG-style GP quadrature (both
-     non-certified, method-style), KernelSHAP, SamplingSHAP.
+     low-budget <=256: 2.5x at K=128 air); instrumented actual call counts.
+   - Ablation N=20 (K=1000): uniform 0.039 / neyman 0.007 / gp 0.071 /
+     full 0.0030; tier4 width 24.7, sim cov 1.0.
+   - Baselines: OddSHAP-style log-odds (exact), ShaplEIG-style GP
+     quadrature (both non-certified, method-style), KernelSHAP,
+     SamplingSHAP; matched-budget comparison CSV.
+   - Frontier: fp probe K=2k..100k — width ~6.5x tighter than spec;
+     sign-cert of the dominant feature (|phi|=0.257) at K>=30k, signs
+     validated vs exact, margin 0.168 at 100k; realised level 0.372 at
+     100k; nominal 1-delta at K~2e5 (Corollary E).
 
 5. **Certification cost frontier** (the honest finding)
    - Width vs K: W ~ 318/sqrt(K); sign-cert feasible at K ~ 1e5-1e6 with

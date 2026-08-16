@@ -75,23 +75,24 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
   pilot-scale; a N≥20-per-regime run is required before this is a paper
   claim.
 
-## RQ4 — Ablation (wine, pilot)
+## RQ4 — Ablation (wine, N=20)
 
-`paper_ablation_wine_summary.csv` (K=400, N=3, shared coalition cache)
+`paper_ablation_wine_summary.csv` (K=1000, N=20, shared coalition cache;
+per-instance rows include tier-4 width / sim. coverage / sign-cert)
 
 | Tier | RMSE |
 |---|---:|
-| 1 Uniform MC | 0.0510 |
-| 2 Neyman MC | 0.0091 |
-| 3 GP-only | 0.0813 |
-| 4 Full GAS | **0.0038** |
+| 1 Uniform MC | 0.0390 |
+| 2 Neyman MC | 0.0070 |
+| 3 GP-only | 0.0712 |
+| 4 Full GAS | **0.0030** |
 
 - Each component contributes; the GP-only tier is worst because the
   exponential-Hamming surrogate underfits the sharp membership boundary and
   its bias is uncorrected without the residual certifier — precisely the
-  motivation for the dual-module design.  **Honest caveat:** N=3 pilot;
-  N≥20 rerun with RMSE+width+coverage per tier is `scripts/ablation.py
-  --n 20`.
+  motivation for the dual-module design.  Tier-4 at K=1000 (spec): width
+  24.7, sim. coverage 1.0, sign-cert 0.  Consistent with the N=3 pilot
+  (0.051 / 0.009 / 0.081 / 0.0038).
 
 ## RQ5 — Matched-budget curves (nominal coalition budgets)
 
@@ -116,13 +117,11 @@ counts are instrumented in the follow-up curves run.
 
 ## Tier-B (group-lag, M=66 → 11 pollutant macros)
 
-`paper_air_tierB_summary.csv` (N=20): RMSE 0.00202, sim. coverage 1.0,
-mean width 9.02, sign-cert 0.
-
-- **Status: being rerun after the temporal label-alignment fix** (the
-  previous run aligned lagged features at time t+24 with labels at time t;
-  the corrected `run_tier_b` uses a contiguous chronological window and the
-  shifted label alignment).
+`paper_air_tierB_summary.csv` (N=20, rerun after the temporal
+label-alignment fix — contiguous chronological window + labels shifted by
+max(LAGS)): RMSE 0.00195, sim. coverage 1.0, mean width 9.20, sign-cert 0.
+(The misaligned run reported 0.00202 / 9.02; the corrected protocol shifts
+both slightly.)
 
 ## SOTA-style baselines
 
@@ -147,10 +146,14 @@ as non-certified reference points — not official reproductions.
 
 - Widths follow W ≈ 318/√K (spec) with errors always ≪ W — the bounds are
   valid, and the bottleneck is attribution scale + conservative R_Δ.
-- The finite-population mode lowers the constant ~16× (W ≈ 19/√K in the
-  frontier regime), making sign-certification feasible at K ~ 10^4–10^5 for
-  the M=3 calibration game (validated) and characterisable for M=11
-  (coupon-collector threshold K ≈ 2×10^5, Corollary E).
+- The finite-population mode lowers the constant ~6.5× on the probe
+  (matched budgets: W_spec/W_fp = 6.6× at 10k, 6.5× at 30k, 6.3× at 100k).
+  At K ≥ 3×10^4 the dominant feature (|φ*|=0.257) is sign-certified with
+  the certified sign matching the exact sign (`paper_width_probe_
+  finite_population.csv`: 1 feature at K=30k/100k, signs_match_exact=1,
+  margin 0.168 at 100k).  Honest caveat: realised level 0.372 at K=100k
+  (δ1=0.60); the nominal 1−δ certificate requires K ≈ 2×10^5
+  (Corollary E).
 
 ## What can / cannot be claimed
 
@@ -166,8 +169,10 @@ as non-certified reference points — not official reproductions.
 
 **Cannot yet claim:**
 - Unconditional RMSE superiority over KernelSHAP (curves contradict it).
-- Sign-certified feature discovery at the standard budget (K=3000) under
-  the spec range; under the finite-population mode this requires the
-  coupon-completed regime (K ~ 10^4–10^5 for M=11), validated on M=3.
+- Sign-certified feature discovery at the standard budget (K=3000): the
+  finite-population width there is ~0.94, still above the dominant
+  attribution (~0.26).  Sign certification is demonstrated at K ≥ 3×10^4
+  (validated vs exact) and the *nominal* 1−δ certificate requires
+  K ≈ 2×10^5 for M=11 (validated end-to-end on M=3).
 - Statistical regime semantics at N=1–2 per regime.
 - Official OddSHAP/ShaplEIG parity (method-style baselines only).
