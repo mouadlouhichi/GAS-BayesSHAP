@@ -87,7 +87,10 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
   photochemical: O3/NO2/WSPM).  N=20 instances total (up from the pilot
   N=1–2).  **Honest caveat:** clean_air has near-zero attributions, so its
   low Spearman is noise-dominated (expected, not a failure); N per regime
-  is still modest (5–10).
+  is still modest (5–10).  Two k-means clusters map to `clean_air` (they
+  differ mainly in absolute pollutant levels, not driver profiles); the
+  naming script now suffixes duplicate names (`clean_air_2`) so the
+  distinction is explicit rather than silently collapsed.
 
 ## RQ4 — Ablation (wine, N=20)
 
@@ -137,14 +140,18 @@ max(LAGS)): RMSE 0.00195, sim. coverage 1.0, mean width 9.20, sign-cert 0.
 (The misaligned run reported 0.00202 / 9.02; the corrected protocol shifts
 both slightly.)
 
-## SOTA-style baselines
+## Reference baselines (renamed per audit: NOT a matched-budget comparison)
 
-`paper_sota_baselines_comparison.csv` (N=20, wine + air, K ∈ {256,1024,2048})
+`paper_reference_baselines_ablation.csv` (N=20, wine + air, K ∈ {256,1024,2048})
 from `gas_bayesshap/benchmarking/sota_baselines.py` +
 `scripts/run_sota_baselines.py`.  **Honest labelling:** official
 OddSHAP / ShaplEIG code is not public in this environment; these are
 method-style reimplementations, reported as non-certified reference points
-— not official reproductions.
+— not official reproductions.  The old `paper_sota_baselines_comparison.csv`
+was **invalidated by an audit finding** (the GP design re-seeded the RNG
+inside the loop, producing identical design masks) and has been replaced;
+the fixed script uses one rng per instance, deduplicates the design, scales
+design size with K, and records `gp_unique_coalitions`.
 
 **Comparability caveat (important):** the OddSHAP-style baseline computes
 the exact Shapley of the *log-odds* game, whose attributions are on an
@@ -198,9 +205,12 @@ consistent with the ablation's GP-only tier.
 **Cannot yet claim:**
 - Unconditional RMSE superiority over KernelSHAP (curves contradict it).
 - Sign-certified feature discovery at the standard budget (K=3000): the
-  finite-population width there is ~0.94, still above the dominant
+  finite-population width there is ~1.9, still above the dominant
   attribution (~0.26).  Sign certification is demonstrated at K ≥ 3×10^4
-  (validated vs exact) and the *nominal* 1−δ certificate requires
-  K ≈ 2×10^5 for M=11 (validated end-to-end on M=3).
-- Statistical regime semantics at N=1–2 per regime.
+  (validated vs exact) and the *nominal* 1−δ certificate closes at
+  K = 2×10^5 on the **real M=11 wine probe** (status CERTIFIED, realised
+  level 0.962) — additionally stress-tested on synthetic M=3/M=6 games
+  (`paper_stress_finite_population.json`).
+- Statistical regime semantics: N=20 total (5–10 per regime); a per-regime
+  N≥20 run is still recommended before strong domain claims.
 - Official OddSHAP/ShaplEIG parity (method-style baselines only).

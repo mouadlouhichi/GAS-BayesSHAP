@@ -152,6 +152,22 @@ def evaluate_instance(model_fn, X, x0, B, eps, budget, n_active=10, seed=1301,
     mc_phi = np.asarray(mc["shapley_values"])
     mc_evals = mc["num_coalition_evals"]
 
+    # finite-population certificate diagnostics (audit P0-4): report the
+    # realised coverage level / delta1 / nominal-level flag in every
+    # per-instance row so simultaneous_coverage_rate is interpretable as
+    # empirical frequency, not as evidence of a formal nominal certificate.
+    fp_diag = {}
+    if range_mode == "finite_population":
+        d1 = r.get("finite_population_delta1")
+        lvl = r.get("finite_population_coverage_level")
+        fp_diag = {
+            "delta1_coupon": float(d1) if d1 is not None else float("nan"),
+            "reported_coverage_level": float(lvl) if lvl is not None else float("nan"),
+            "coupon_threshold_satisfied": bool(r.get("finite_population_at_level_delta", False)),
+            "certificate_at_nominal_level": bool(r.get("certificate_at_nominal_level", False)),
+            "certificate_is_rigorous": bool(r.get("certificate_is_rigorous", False)),
+        }
+
     return {
         "phi_exact": phi_exact, "phi_gas": phi_gas, "W_gas": W_gas,
         "kernel_phi": np.asarray(kernel_phi), "mc_phi": mc_phi,
@@ -163,6 +179,7 @@ def evaluate_instance(model_fn, X, x0, B, eps, budget, n_active=10, seed=1301,
         "sim_cov": sim_cov, "mar_cov": mar_cov, "sign_cert": sign_cert,
         "mean_width": float(np.mean(W_gas)), "max_width": float(np.max(W_gas)),
         "status": r["status"], "converged": bool(r["converged"]),
+        **fp_diag,
     }
 
 
@@ -215,6 +232,12 @@ def run_dataset(name, X, feat_names, n_clusters, eps, budget, N, range_mode="spe
         "marginal_coverage_rate": df["mar_cov"].mean(),
         "sign_certified_fraction": df["sign_cert"].mean(),
         "mean_width": df["mean_width"].mean(), "max_width_max": df["max_width"].max(),
+        "mean_reported_coverage_level": (df["reported_coverage_level"].mean()
+                                         if "reported_coverage_level" in df else None),
+        "mean_delta1_coupon": (df["delta1_coupon"].mean()
+                               if "delta1_coupon" in df else None),
+        "fraction_at_nominal_level": (df["certificate_at_nominal_level"].mean()
+                                      if "certificate_at_nominal_level" in df else None),
         "gas_evals_mean": df["gas_evals"].mean(), "exact_evals": df["exact_evals"].iloc[0],
         "kernel_evals": df["kernel_evals"].iloc[0], "mc_evals_mean": df["mc_evals"].mean(),
         "converged_fraction": df["converged"].mean(),
@@ -243,7 +266,9 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
             fn = make_proba_fn(m, feat_names, cid)
             bg = X.sample(64, random_state=1301 + i).values
             gas_ev, gas_me, ker_me, mc_me = [], [], [], []
+            t_wall = {"gas": 0.0, "kernel": 0.0, "mc": 0.0}
             try:
+                t0g = time.time()
                 eng = GASBayesSHAP(fn, bg, output_bounds=(0.0, 1.0),
                                    rng=np.random.RandomState(1301 + i),
                                    config={"checkpoint_enabled": False, "cache_enabled": True,
@@ -251,25 +276,30 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
                                            "range_mode": range_mode})
                 r = eng.explain(x0, epsilon=0.05, delta=0.05, max_budget=K,
                                 n_pilot=3, n_active_steps=10)
+                t_wall["gas"] = time.time() - t0g
                 phi_exact = exact_shapley_from_values(
                     exact_game_values(CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0)), x0, X.shape[1]),
                     X.shape[1])
                 r_gas.append(rmse(np.asarray(r["shapley_values"]), phi_exact))
                 gas_ev.append(r["num_coalition_evals_this_call"])
                 gas_me.append(r.get("num_model_evals_this_call", 0))
-                # KernelSHAP at K (instrumented: count actual model forward passes)
+                # KernelSHAP at K (instrumented: count actual model forward passes + wall time)
                 kcalls = {"n": 0}
                 def fn_counted(xx):
                     kcalls["n"] += 1
                     return fn(xx)
+                t0k = time.time()
                 ke = shap.KernelExplainer(_proba_matrix_fn(fn_counted), bg)
                 kp = ke.shap_values(x0, nsamples=K)
+                t_wall["kernel"] = time.time() - t0k
                 r_ker.append(rmse(np.asarray(kp), phi_exact))
                 ker_me.append(kcalls["n"])
                 # SamplingSHAP at ~K coalition evals (instrumented via oracle counter)
+                t0m = time.time()
                 mc_oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0))
                 mc = monte_carlo_shapley(mc_oracle, x0, n_samples=max(10, K // (X.shape[1] + 1)),
                                          rng=np.random.RandomState(1301 + i))
+                t_wall["mc"] = time.time() - t0m
                 r_mc.append(rmse(np.asarray(mc["shapley_values"]), phi_exact))
                 mc_me.append(mc_oracle.total_model_evals)
             except Exception as e:
@@ -281,7 +311,10 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
                      "gas_coalition_evals_actual": float(np.mean(gas_ev)) if gas_ev else np.nan,
                      "gas_model_evals_actual": float(np.mean(gas_me)) if gas_me else np.nan,
                      "kernel_model_evals_actual": float(np.mean(ker_me)) if ker_me else np.nan,
-                     "mc_model_evals_actual": float(np.mean(mc_me)) if mc_me else np.nan})
+                     "mc_model_evals_actual": float(np.mean(mc_me)) if mc_me else np.nan,
+                     "gas_wall_s": float(np.mean([t_wall["gas"]] * len(r_gas))) if r_gas else np.nan,
+                     "kernel_wall_s": float(t_wall["kernel"]) if r_ker else np.nan,
+                     "mc_wall_s": float(t_wall["mc"]) if r_mc else np.nan})
         print(f"  K={K}: gas={rows[-1]['gas_rmse']:.5f} kernel={rows[-1]['kernel_rmse']:.5f} "
               f"mc={rows[-1]['mc_rmse']:.5f} | gas_ev={rows[-1]['gas_coalition_evals_actual']:.0f} "
               f"gas_me={rows[-1]['gas_model_evals_actual']:.0f} "

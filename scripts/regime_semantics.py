@@ -84,6 +84,14 @@ def main():
     centers_raw = pd.DataFrame(
         StandardScaler().fit(X).inverse_transform(km.cluster_centers_), columns=FEATURES)
     regime_names = [name_regime(centers_raw.iloc[c], X) for c in range(args.clusters)]
+    # audit P1-8: two clusters can map to the same name (e.g. two clean-air
+    # subregimes); suffix duplicates so the distinction is explicit.
+    seen = {}
+    for c in range(args.clusters):
+        n = regime_names[c]
+        seen[n] = seen.get(n, 0) + 1
+        if seen[n] > 1:
+            regime_names[c] = f"{n}_{seen[n]}"
     print("named regimes:", dict(enumerate(regime_names)))
 
     # surrogate
