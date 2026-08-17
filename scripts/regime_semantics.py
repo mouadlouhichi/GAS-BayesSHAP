@@ -120,8 +120,11 @@ def main():
         r = eng.explain(x0, epsilon=args.eps, delta=0.05, max_budget=args.budget,
                         n_pilot=3, n_active_steps=10)
         phi = np.asarray(r["shapley_values"])
-        # RQ3: rank correlation of GAS |phi| vs expected drivers
-        exp = np.array([EXPECTED_DRIVERS[rname][f] for f in FEATURES])
+        # RQ3: rank correlation of GAS |phi| vs expected drivers.
+        # Suffixed duplicate names (clean_air_2) share the base regime's
+        # expected-driver reference: strip the _N suffix for the lookup.
+        rref = rname.rsplit("_", 1)[0] if rname.rsplit("_", 1)[-1].isdigit() else rname
+        exp = np.array([EXPECTED_DRIVERS[rref][f] for f in FEATURES])
         abs_phi = np.abs(phi)
         rho, _ = spearmanr(abs_phi, exp) if exp.std() > 0 else (np.nan, 1.0)
         rows.append({

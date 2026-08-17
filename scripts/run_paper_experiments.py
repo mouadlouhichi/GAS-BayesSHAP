@@ -266,7 +266,7 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
             fn = make_proba_fn(m, feat_names, cid)
             bg = X.sample(64, random_state=1301 + i).values
             gas_ev, gas_me, ker_me, mc_me = [], [], [], []
-            t_wall = {"gas": 0.0, "kernel": 0.0, "mc": 0.0}
+            w_gas, w_ker, w_mc = [], [], []
             try:
                 t0g = time.time()
                 eng = GASBayesSHAP(fn, bg, output_bounds=(0.0, 1.0),
@@ -276,7 +276,7 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
                                            "range_mode": range_mode})
                 r = eng.explain(x0, epsilon=0.05, delta=0.05, max_budget=K,
                                 n_pilot=3, n_active_steps=10)
-                t_wall["gas"] = time.time() - t0g
+                w_gas.append(time.time() - t0g)
                 phi_exact = exact_shapley_from_values(
                     exact_game_values(CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0)), x0, X.shape[1]),
                     X.shape[1])
@@ -291,7 +291,7 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
                 t0k = time.time()
                 ke = shap.KernelExplainer(_proba_matrix_fn(fn_counted), bg)
                 kp = ke.shap_values(x0, nsamples=K)
-                t_wall["kernel"] = time.time() - t0k
+                w_ker.append(time.time() - t0k)
                 r_ker.append(rmse(np.asarray(kp), phi_exact))
                 ker_me.append(kcalls["n"])
                 # SamplingSHAP at ~K coalition evals (instrumented via oracle counter)
@@ -299,7 +299,7 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
                 mc_oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0))
                 mc = monte_carlo_shapley(mc_oracle, x0, n_samples=max(10, K // (X.shape[1] + 1)),
                                          rng=np.random.RandomState(1301 + i))
-                t_wall["mc"] = time.time() - t0m
+                w_mc.append(time.time() - t0m)
                 r_mc.append(rmse(np.asarray(mc["shapley_values"]), phi_exact))
                 mc_me.append(mc_oracle.total_model_evals)
             except Exception as e:
@@ -312,9 +312,9 @@ def run_curves(name, X, feat_names, n_clusters, Ks, N=10, range_mode="spec"):
                      "gas_model_evals_actual": float(np.mean(gas_me)) if gas_me else np.nan,
                      "kernel_model_evals_actual": float(np.mean(ker_me)) if ker_me else np.nan,
                      "mc_model_evals_actual": float(np.mean(mc_me)) if mc_me else np.nan,
-                     "gas_wall_s": float(np.mean([t_wall["gas"]] * len(r_gas))) if r_gas else np.nan,
-                     "kernel_wall_s": float(t_wall["kernel"]) if r_ker else np.nan,
-                     "mc_wall_s": float(t_wall["mc"]) if r_mc else np.nan})
+                     "gas_wall_s": float(np.mean(w_gas)) if w_gas else np.nan,
+                     "kernel_wall_s": float(np.mean(w_ker)) if w_ker else np.nan,
+                     "mc_wall_s": float(np.mean(w_mc)) if w_mc else np.nan})
         print(f"  K={K}: gas={rows[-1]['gas_rmse']:.5f} kernel={rows[-1]['kernel_rmse']:.5f} "
               f"mc={rows[-1]['mc_rmse']:.5f} | gas_ev={rows[-1]['gas_coalition_evals_actual']:.0f} "
               f"gas_me={rows[-1]['gas_model_evals_actual']:.0f} "

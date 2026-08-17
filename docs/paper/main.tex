@@ -464,11 +464,15 @@ $\sim10^2\times$ the membership-game magnitude), so its RMSE vs the
 membership-game exact is dominated by the transform's scale, not by
 estimation error; we report it as a transform-sensitivity reference rather
 than a fidelity baseline.  The ShaplEIG-style GP quadrature ($N=20$,
-RMSE $\approx0.077$--$0.086$ on the membership game, from the
-pre-fix run; the regenerated values after the design fix are reported in
-Section~\ref{sec:exp}) is on the same scale
-and confirms that a surrogate without residual correction is not sufficient
-for fidelity.
+regenerated after fixing a design bug in which all design masks were
+identical) is on the same scale as GAS (RMSE $0.002$--$0.012$ at matched
+design cost; wine $K{=}2048$: GAS $0.00205$ vs GP $0.00203$) and is
+\emph{competitive} — a well-tuned GP Bayesian-quadrature baseline is not
+dominated on RMSE.  GAS's differentiators are therefore the
+distribution-free anytime certificates, the Neyman residual control and the
+empirically-validated coverage, not unconditional RMSE dominance over
+GP-BQ.  The pre-fix GP numbers ($0.077$--$0.086$) were an artifact of the
+degenerate design and are invalid.
 
 \subsection{RQ5: matched-budget curves}\label{sec:rq5}
 \begin{table}[t]\centering\small

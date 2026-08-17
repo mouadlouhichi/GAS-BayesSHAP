@@ -69,9 +69,14 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
 - **4.8–9.3× width reduction at identical RMSE and coverage.**  At the
   standard budget the fp width (~1.9) is still above the dominant
   attribution (~0.26), so sign-cert remains 0 at K=3000 — honest.
-- The *nominal* 1−δ certificate requires the coupon-completed frontier
-  budget (K ≈ 2×10^5 for M=11, Corollary E), demonstrated in the probe
-  (below).
+- **Certificate diagnostics (audit P0-4, now in every fp CSV):** at K=3000
+  all 50 instances per dataset report `reported_coverage_level=0.0`,
+  `delta1_coupon≈60`, `coupon_threshold_satisfied=False`,
+  `certificate_at_nominal_level=False`, `certificate_is_rigorous=False`
+  — the intervals are width-tight but are **empirical-event** coverage
+  (sim_cov 1.0), NOT nominal 1−δ certificates.  The *nominal* 1−δ
+  certificate requires the coupon-completed frontier budget
+  (K ≈ 2×10^5 for M=11, Corollary E), demonstrated in the probe (below).
 
 ## RQ3 — Regime semantics (air quality, Aotizhongxin station)
 
@@ -158,10 +163,18 @@ the exact Shapley of the *log-odds* game, whose attributions are on an
 unbounded scale — its RMSE vs the membership-game exact (≈1.5–1.7) is
 ~440–540× GAS's and is dominated by the transform's scale, not by
 estimation error.  It is therefore reported as a *transform-sensitivity*
-reference, not a fidelity baseline.  The ShaplEIG-style GP quadrature
-(RMSE ≈0.077–0.086 on the membership game, same scale as GAS) confirms
-that a surrogate without residual correction is insufficient for fidelity —
-consistent with the ablation's GP-only tier.
+reference, not a fidelity baseline.
+
+**Fixed-design GP-quadrature results (regenerated after the audit's design
+bug):** with a proper deduplicated design (≥235 unique coalitions per run),
+the GP-quadrature RMSE is 0.002–0.012 — i.e. *competitive with GAS* at
+matched design cost (wine K=2048: GAS 0.00205 vs GP 0.00203; air K=1024:
+GAS 0.00321 vs GP 0.00286).  This is the honest, stronger result: a
+well-tuned GP Bayesian-quadrature baseline is not dominated on RMSE; GAS's
+differentiators are the distribution-free anytime certificates, the Neyman
+residual control, and the empirically-validated coverage — not unconditional
+RMSE dominance over GP-BQ.  The pre-fix GP numbers (0.077–0.086) were an
+artifact of the degenerate design and are **invalid**.
 
 ## The certification cost frontier
 
