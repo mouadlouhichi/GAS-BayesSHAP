@@ -1,0 +1,2 @@
+n_instances,rmse_mean,simultaneous_coverage_rate,sign_certified_fraction,mean_width,gas_evals_mean,range_mode
+20,0.0019489549562000889,1.0,0.0,1.6147045076944089,1434.35,finite_population

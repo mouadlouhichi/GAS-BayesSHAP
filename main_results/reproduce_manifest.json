@@ -1,0 +1,190 @@
+{
+ "commit": "31222aef81cda03440c7b097802b780e286fecfb",
+ "git_dirty": true,
+ "python": "3.12.13",
+ "steps_requested": [],
+ "n_artifacts": 45,
+ "artifacts": {
+  "paper_ablation_wine.csv": {
+   "sha256": "21d7ab99dd94f012",
+   "bytes": 2772
+  },
+  "paper_ablation_wine_summary.csv": {
+   "sha256": "07aa4979d47e9083",
+   "bytes": 317
+  },
+  "paper_air_instances.csv": {
+   "sha256": "8711acabad211e20",
+   "bytes": 4935
+  },
+  "paper_air_matched_budget.csv": {
+   "sha256": "db5e9651013cb052",
+   "bytes": 925
+  },
+  "paper_air_n20_budget3000_instances.csv": {
+   "sha256": "12c50b470e1c6e9e",
+   "bytes": 18946
+  },
+  "paper_air_n20_budget3000_summary.csv": {
+   "sha256": "9331c6435b969e12",
+   "bytes": 487
+  },
+  "paper_air_n50_budget3000_instances.csv": {
+   "sha256": "4299209024e39731",
+   "bytes": 47073
+  },
+  "paper_air_n50_budget3000_rangefinite_population_instances.csv": {
+   "sha256": "b93ca57e6491e06c",
+   "bytes": 48596
+  },
+  "paper_air_n50_budget3000_rangefinite_population_summary.csv": {
+   "sha256": "9c1345fdd3f92c6d",
+   "bytes": 618
+  },
+  "paper_air_n50_budget3000_summary.csv": {
+   "sha256": "72e3d46dcc1d7c85",
+   "bytes": 489
+  },
+  "paper_air_summary.csv": {
+   "sha256": "ac47d7cb4f14e8a6",
+   "bytes": 486
+  },
+  "paper_air_tierB_instances.csv": {
+   "sha256": "3491adbf79d9c05b",
+   "bytes": 1639
+  },
+  "paper_air_tierB_rangefinite_population_instances.csv": {
+   "sha256": "ccbc2f38e5d78641",
+   "bytes": 1652
+  },
+  "paper_air_tierB_rangefinite_population_summary.csv": {
+   "sha256": "385c003bbf60bfa0",
+   "bytes": 188
+  },
+  "paper_air_tierB_summary.csv": {
+   "sha256": "b174e414b9da4dd2",
+   "bytes": 174
+  },
+  "paper_air_width_vs_budget.csv": {
+   "sha256": "729608deb528801d",
+   "bytes": 337
+  },
+  "paper_reference_baselines_ablation.csv": {
+   "sha256": "b284b31990cd1704",
+   "bytes": 12535
+  },
+  "paper_regime_semantics.csv": {
+   "sha256": "1897759447135dc7",
+   "bytes": 1524
+  },
+  "paper_regime_semantics_summary.csv": {
+   "sha256": "dcda1f9420dd1f6d",
+   "bytes": 255
+  },
+  "paper_sota_baselines_comparison.csv": {
+   "sha256": "0791a6041b1c9ba3",
+   "bytes": 9215
+  },
+  "paper_width_probe.csv": {
+   "sha256": "f5df8c60a2e6648b",
+   "bytes": 825
+  },
+  "paper_width_probe_finite_population.csv": {
+   "sha256": "ac45ac8289e60409",
+   "bytes": 635
+  },
+  "paper_wine_instances.csv": {
+   "sha256": "73362224db8ddba6",
+   "bytes": 5910
+  },
+  "paper_wine_matched_budget.csv": {
+   "sha256": "f638240547ccadc9",
+   "bytes": 930
+  },
+  "paper_wine_n20_budget3000_instances.csv": {
+   "sha256": "ae4b87b596ae4c5d",
+   "bytes": 18730
+  },
+  "paper_wine_n20_budget3000_summary.csv": {
+   "sha256": "16dce50a10f9cdb2",
+   "bytes": 486
+  },
+  "paper_wine_n50_budget3000_instances.csv": {
+   "sha256": "91d1d4d6aee1893e",
+   "bytes": 46418
+  },
+  "paper_wine_n50_budget3000_rangefinite_population_instances.csv": {
+   "sha256": "3e56b0372aa68f16",
+   "bytes": 48033
+  },
+  "paper_wine_n50_budget3000_rangefinite_population_summary.csv": {
+   "sha256": "7d20b158dd17eac1",
+   "bytes": 619
+  },
+  "paper_wine_n50_budget3000_summary.csv": {
+   "sha256": "34c58b95414b3f17",
+   "bytes": 486
+  },
+  "paper_wine_range_modes_n5.csv": {
+   "sha256": "832f8a0dc26547f7",
+   "bytes": 1230
+  },
+  "paper_wine_range_modes_n5_summary.csv": {
+   "sha256": "0d794c3b4285aabb",
+   "bytes": 272
+  },
+  "paper_wine_summary.csv": {
+   "sha256": "2bd722e0800ce89b",
+   "bytes": 512
+  },
+  "paper_wine_width_vs_budget.csv": {
+   "sha256": "8513a6d41800581c",
+   "bytes": 336
+  },
+  "paper_calibration_eps0.05_finite_population.json": {
+   "sha256": "9cfbe3cd3027665f",
+   "bytes": 255
+  },
+  "paper_calibration_eps0.05_spec.json": {
+   "sha256": "cbf6041feb3ff619",
+   "bytes": 245
+  },
+  "paper_calibration_eps0.1_finite_population.json": {
+   "sha256": "3803356af39334d2",
+   "bytes": 254
+  },
+  "paper_calibration_eps0.1_spec.json": {
+   "sha256": "188d1b50fa3b2808",
+   "bytes": 244
+  },
+  "paper_calibration_eps0.2_finite_population.json": {
+   "sha256": "31d060b7dfd6b56b",
+   "bytes": 254
+  },
+  "paper_calibration_eps0.2_spec.json": {
+   "sha256": "16dabba55a932255",
+   "bytes": 244
+  },
+  "paper_calibration_eps0.5_finite_population.json": {
+   "sha256": "f63b6a5f66cb0c8c",
+   "bytes": 254
+  },
+  "paper_calibration_eps0.5_spec.json": {
+   "sha256": "9638266ace91d25e",
+   "bytes": 244
+  },
+  "paper_coverage_calibration_R500.json": {
+   "sha256": "299557ff6886922f",
+   "bytes": 305
+  },
+  "paper_coverage_calibration_R500_finite_population.json": {
+   "sha256": "52c6d2f41d374f52",
+   "bytes": 875
+  },
+  "paper_results_summary.md": {
+   "sha256": "3101093dc0f526c8",
+   "bytes": 11627
+  }
+ },
+ "timestamp": "2026-08-17T21:45:11Z"
+}
