@@ -86,16 +86,17 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
 |---|---:|---:|---:|
 | winter_smog | 5 | 0.00101 | 0.559 |
 | photochemical | 5 | 0.00206 | 0.418 |
-| clean_air | 10 | 0.00256 | 0.056 |
+| clean_air | 5 | 0.00251 | 0.228 |
+| clean_air_2 | 5 | 0.00261 | −0.116 |
 
 - Regimes are named by driver profile (winter_smog: PM10/CO/PM2.5;
-  photochemical: O3/NO2/WSPM).  N=20 instances total (up from the pilot
-  N=1–2).  **Honest caveat:** clean_air has near-zero attributions, so its
-  low Spearman is noise-dominated (expected, not a failure); N per regime
-  is still modest (5–10).  Two k-means clusters map to `clean_air` (they
-  differ mainly in absolute pollutant levels, not driver profiles); the
-  naming script now suffixes duplicate names (`clean_air_2`) so the
-  distinction is explicit rather than silently collapsed.
+  photochemical: O3/NO2/WSPM).  N=20 instances total.  The two clusters
+  that both mapped to `clean_air` are now distinguished (duplicate names
+  suffixed): clean_air has weak positive driver correlation, clean_air_2
+  negative — evidence of two distinct low-pollution subregimes rather than
+  one collapsed label.  **Honest caveat:** the clean-air subregimes have
+  near-zero attributions, so their rank correlations are noise-dominated;
+  the strongest semantic signal is winter_smog and photochemical.
 
 ## RQ4 — Ablation (wine, N=20)
 
@@ -128,6 +129,8 @@ per-instance rows include tier-4 width / sim. coverage / sign-cert)
 | 1024 | 0.00197 | **0.00089** | 0.00314 | **0.00124** |
 | 2048 | 0.00133 | **0.00014** | 0.00208 | **0.00026** |
 
+**Wall-clock note:** the committed curves carry per-method wall-clock columns; the mean-aggregation fix for those columns is in the runner, so a section-C rerun is queued to replace the last-instance timings currently committed.
+
 **Honest interpretation (rewritten after the audit):** GAS-BayesSHAP
 dominates Monte Carlo everywhere and is competitive/better at low budgets
 (≤ 256–512), while KernelSHAP achieves lower point-estimate RMSE at
@@ -144,6 +147,12 @@ label-alignment fix — contiguous chronological window + labels shifted by
 max(LAGS)): RMSE 0.00195, sim. coverage 1.0, mean width 9.20, sign-cert 0.
 (The misaligned run reported 0.00202 / 9.02; the corrected protocol shifts
 both slightly.)
+
+**Finite-population Tier-B** (`paper_air_tierB_rangefinite_population_summary.csv`,
+N=20): RMSE 0.00195 (unchanged), sim. coverage 1.0, mean width **1.61** —
+a 5.7× reduction vs the spec range at identical fidelity.  No macro-player
+is sign-certified at this budget (consistent with the wine/air N=50 fp
+finding).
 
 ## Reference baselines (renamed per audit: NOT a matched-budget comparison)
 

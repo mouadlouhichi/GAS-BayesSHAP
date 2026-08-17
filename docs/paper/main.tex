@@ -407,6 +407,9 @@ Four pollution regimes are identified by k-means and named by their driver
 profile (Table~\ref{rq3}); Tier-B group-lag games ($M=66$ lags $\to 11$
 pollutant macros, $N=20$, alignment-corrected protocol) recover the same
 drivers with macro RMSE $0.00195$ and simultaneous coverage $1.0$.
+Running Tier-B under the finite-population range keeps the fidelity
+(RMSE $0.00195$) and coverage ($1.0$) while shrinking the mean certified
+width from $9.20$ (spec) to $1.61$ — a $5.7\times$ reduction.
 \begin{table}[t]\centering\small
 \begin{tabular}{lccl}
 \toprule
@@ -414,15 +417,18 @@ Regime & $\rho$ & Top drivers & Instances \\
 \midrule
 winter\_smog & 0.559 & PM10, CO, PM2.5 & 5 \\
 photochemical & 0.418 & O3, NO2, WSPM & 5 \\
-clean\_air & 0.056 & -- & 10 \\
+clean\_air & 0.228 & -- & 5 \\
+clean\_air\_2 & $-0.116$ & -- & 5 \\
 \bottomrule
 \end{tabular}
 \caption{RQ3: per-regime Spearman correlation between GAS-BayesSHAP
 attributions and the exact ones, Aotizhongxin station ($N=20$ instances
-total, up from the pilot $N{=}1$--$2$).  Winter smog is dominated by
-combustion pollutants; the photochemical regime by O$_3$/NO$_2$; the
-clean-air regime has near-zero attributions, so its rank agreement is
-noise-dominated (low $\rho$ is expected, not a failure).}
+total).  The two k-means clusters that both mapped to ``clean\_air'' are
+now distinguished (clean\_air vs clean\_air\_2): the first shows a weak
+positive driver correlation, the second is negative — evidence of two
+distinct low-pollution subregimes (differing mainly in absolute levels and
+dew-point/wind drivers).  Winter smog is dominated by combustion
+pollutants; the photochemical regime by O$_3$/NO$_2$.}
 \label{rq3}
 \end{table}
 
