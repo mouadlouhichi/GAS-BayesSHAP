@@ -69,6 +69,18 @@ A(md("# Beijing Air-Quality — Tier A Exact Ground-Truth + Certified GAS-BayesS
      "regime-structured fallback (offline sandbox).  All scientific algorithms are imported from "
      "the `gas_bayesshap` package — never duplicated here."))
 
+A(md("> \u26a0\ufe0f **SMOKE-TEST / DEMO NOTEBOOK** — fast configuration "
+        "(`epsilon=15.0, max_budget=1500`); **NOT** the paper driver.  Paper "
+        "results come from `scripts/run_paper_experiments.py` "
+        "(\u03b5=0.05, budget=3000, N=50).  Set `PAPER_GRADE = True` below for "
+        "paper-grade settings (expect BUDGET_EXHAUSTED + honest widths)."))
+
+A(md("## 0. Configuration (smoke vs paper grade)"))
+A(cell("""PAPER_GRADE = False
+EPS = 0.05 if PAPER_GRADE else 15.0
+BUDGET = 3000 if PAPER_GRADE else 1500
+print("mode =", "paper-grade" if PAPER_GRADE else "smoke", "| eps =", EPS, "| budget =", BUDGET)"""))
+
 A(md("## Tier A — Exact Ground-Truth Verification (M = 11)\n\n## 1. Load Air-Quality dataset"))
 A(cell("""import os, sys, io, zipfile
 import numpy as np
@@ -520,7 +532,7 @@ A(cell("""engine = GASBayesSHAP(
         "run_id": f"beijing-tierA-regime{cluster_id}",
     },
 )
-result = engine.explain(x0, epsilon=15.0, delta=0.05, max_budget=1500,
+result = engine.explain(x0, epsilon=EPS, delta=0.05, max_budget=BUDGET,
                         n_pilot=3, n_active_steps=10)
 phi_gas = np.asarray(result["shapley_values"])
 W_proj = np.asarray(result["certified_projected_widths"])
@@ -687,7 +699,7 @@ A(cell("""eng_g = GASBayesSHAP(
         "run_id": "beijing-tierB-grouplag",
     },
 )
-res_g = eng_g.explain(x0_lag, epsilon=15.0, delta=0.05, max_budget=1500,
+res_g = eng_g.explain(x0_lag, epsilon=EPS, delta=0.05, max_budget=BUDGET,
                       n_pilot=3, n_active_steps=10)
 phi_gas_g = np.asarray(res_g["shapley_values"])
 W_proj_g = np.asarray(res_g["certified_projected_widths"])
@@ -736,7 +748,7 @@ A(md("## Summary\n\n"
      "coalitions; GAS-BayesSHAP certifies the 11 macro-players (per-variable lag blocks).\n"
      "- TreeSHAP explains the logit, KernelSHAP/SamplingSHAP explain the probability game — only "
      "GAS-BayesSHAP carries the anytime certification guarantee.\n"
-     "- **Convergence note:** this notebook uses `epsilon=15.0, max_budget=1500` so it "
+     "- **Convergence note:** this notebook defaults to smoke settings `epsilon=15.0, max_budget=1500` so it "
      "completes quickly (CERTIFIED).  The anytime widths on this game plateau near ~12 for "
      "that budget; tightening `epsilon` (e.g. 0.5) requires a much larger budget (e.g. "
      "10^4 coalition evals).  The guarantee is valid at every stopping point (simultaneous "

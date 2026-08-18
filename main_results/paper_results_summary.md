@@ -2,6 +2,18 @@
 
 All numbers below are read from the committed `main_results/paper_*.csv` /
 `*.json` artifacts.  Every experiment is reproducible via
+
+> **Curation note (latest audit):** stale pilot artifacts (N=6 wine, N=5
+> air summaries/instances and the invalid pre-fix
+> `paper_sota_baselines_comparison.csv`) have been moved to
+> `main_results/archive_smoke/`; only current paper-facing files remain in
+> `main_results/`.  The demo notebooks (`SHAP_WINE_GAS.ipynb`,
+> `AIR_QUALITY_GAS.ipynb`) now carry a loud SMOKE-TEST banner and a
+> `PAPER_GRADE` switch (ε=0.05/budget=3000) so they cannot be mistaken for
+> the paper drivers (`scripts/run_paper_experiments.py`).
+> **Pending:** `main_results/RUN_FINAL_CERTIFICATION.ipynb` — multi-instance
+> nominal 1−δ certification at K=200k (wine+air, N=3 each), validating the
+> frontier closure on real instances with exact-sign checks.
 `scripts/run_paper_experiments.py`, `scripts/probe_width_tightness.py`,
 `scripts/probe_finite_population.py`, `scripts/ablation.py`,
 `scripts/run_sota_baselines.py`, `scripts/regime_semantics.py`, and the

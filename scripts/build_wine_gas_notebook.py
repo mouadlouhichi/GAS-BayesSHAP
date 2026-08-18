@@ -58,6 +58,23 @@ A(md("# Wine Quality — Tier-A Exact Ground-Truth Verification with GAS-BayesSH
      "> Data loading: local `../data/winequality-white.csv` → UCI URL → synthetic fallback "
      "(offline sandbox).  All scientific algorithms are imported from the `gas_bayesshap` package."))
 
+A(md("> \u26a0\ufe0f **SMOKE-TEST / DEMO NOTEBOOK** — fast configuration "
+        "(`epsilon=15.0, max_budget=1500`) so it converges quickly.  **NOT** "
+        "the paper experiment driver.  Paper results (\u03b5=0.05, budget=3000, "
+        "N=50) come from `scripts/run_paper_experiments.py`; the full evidence "
+        "pipeline is `main_results/RUN_FINAL_EVIDENCE.ipynb` / "
+        "`main_results/RUN_AUDIT_FIXES.ipynb`.  To reproduce paper-grade "
+        "settings here, set `PAPER_GRADE = True` in the config cell below."))
+
+A(md("## 0. Configuration (smoke vs paper grade)"))
+A(cell("""# SMOKE defaults (fast convergence); set PAPER_GRADE=True for the paper's
+# tight settings (eps=0.05, budget=3000) -- then expect BUDGET_EXHAUSTED and
+# non-vacuous widths, exactly as in the paper's tables.
+PAPER_GRADE = False
+EPS = 0.05 if PAPER_GRADE else 15.0
+BUDGET = 3000 if PAPER_GRADE else 1500
+print("mode =", "paper-grade" if PAPER_GRADE else "smoke", "| eps =", EPS, "| budget =", BUDGET)"""))
+
 A(md("## 1. Load Wine Dataset"))
 A(cell("""import os, sys
 import numpy as np
@@ -278,7 +295,7 @@ A(cell("""engine = GASBayesSHAP(
         "run_id": f"wine-tierA-cluster{cluster_id}",
     },
 )
-result = engine.explain(x0, epsilon=15.0, delta=0.05, max_budget=1500,
+result = engine.explain(x0, epsilon=EPS, delta=0.05, max_budget=BUDGET,
                         n_pilot=3, n_active_steps=10)
 phi_gas = np.asarray(result["shapley_values"])
 W_proj = np.asarray(result["certified_projected_widths"])
