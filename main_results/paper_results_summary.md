@@ -129,7 +129,12 @@ per-instance rows include tier-4 width / sim. coverage / sign-cert)
 | 1024 | 0.00197 | **0.00089** | 0.00314 | **0.00124** |
 | 2048 | 0.00133 | **0.00014** | 0.00208 | **0.00026** |
 
-**Wall-clock note:** the committed curves carry per-method wall-clock columns; the mean-aggregation fix for those columns is in the runner, so a section-C rerun is queued to replace the last-instance timings currently committed.
+**Wall-clock (corrected, committed):** the curves now carry mean per-method
+wall-clock over the N instances (monotonic in K; e.g. wine GAS 7.2 → 21.9s,
+Kernel 2.4 → 37.6s, MC 1.3 → 20.2s across K=128..2048).  GAS's Stage-1 GP
+design adds fixed overhead at low K; at K=2048 KernelSHAP is ~1.7× slower
+in wall-clock while more accurate on RMSE — consistent with the
+certification-premium framing.
 
 **Honest interpretation (rewritten after the audit):** GAS-BayesSHAP
 dominates Monte Carlo everywhere and is competitive/better at low budgets
