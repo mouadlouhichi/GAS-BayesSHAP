@@ -60,6 +60,13 @@ Information Fusion / Machine Learning (applied framing).
      validated vs exact; **nominal 1-delta CERTIFIED at K=200k** (converged,
      realised level 0.962, delta1=0.013, margin 0.207) — Corollary E
      confirmed on real data.
+   - **Multi-instance nominal certification (N=3 per dataset, K=200k):**
+     5/6 instances at nominal 1-delta (wine 3/3 levels 0.962-0.974, air
+     2/3 levels 0.952-0.968); **13 sign-certified features total, every
+     sign validated vs exact** (RMSE ~1e-4, sim cov 1.0).  Air inst 0
+     honest outlier: coupon open (delta1=4.42), at_nominal=False, level 0,
+     though width converged — convergence vs nominality are distinct axes,
+     both reported (paper_nominal_certification_{wine,air}.csv).
    - Adversarial stress test (R=200): M=3 coupon closes -> nominal reached
      on 99.5% of trials; M=6 coupon open -> flag False, level 0.0 honest.
    - Tight-eps calibration (0.05..0.5, R=200, both modes): coverage 1.0.
