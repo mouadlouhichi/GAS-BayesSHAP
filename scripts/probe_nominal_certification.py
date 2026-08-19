@@ -82,6 +82,13 @@ def run_instance(name, X, feat_names, n_clusters, i, K, eps, m, X_te):
     sc = np.abs(phi) > W
     sc_ok = int(np.all(np.sign(phi[sc]) == np.sign(phi_exact[sc]))) if sc.any() else 1
     margin = float(np.min(np.abs(phi_exact[sc]) - W[sc])) if sc.any() else float("nan")
+    unique = int(r["num_coalition_evals_this_call"])   # cache misses = unique coalitions
+    attempted = int(r.get("extra", {}).get("stage2_attempted_total")
+                    if isinstance(r.get("extra"), dict) else r.get("stage2_attempted_total", unique))
+    if attempted == 0:
+        attempted = unique
+    cache_hit_rate = float(r.get("extra", {}).get("cache_hit_rate", 0.0)) \
+        if isinstance(r.get("extra"), dict) else float(r.get("cache_hit_rate", 0.0))
     row = {
         "dataset": name, "instance": i, "cluster": cid, "K": K,
         "status": r["status"], "converged": bool(r["converged"]),
@@ -96,7 +103,11 @@ def run_instance(name, X, feat_names, n_clusters, i, K, eps, m, X_te):
         "min_certified_margin": margin,
         "mean_width": float(np.mean(W)),
         "max_width": float(np.max(W)),
-        "coalition_evals": r["num_coalition_evals_this_call"],
+        "unique_coalition_evals": unique,
+        "attempted_stage2_draws": attempted,
+        "unique_fraction_of_power_set": float(unique) / float(2 ** X.shape[1]),
+        "cache_hit_rate": cache_hit_rate,
+        "coalition_evals": unique,  # alias kept for backward compat
         "elapsed_s": round(dt, 1),
     }
     print(f"  {name} inst {i}: {r['status']} conv={row['converged']} "

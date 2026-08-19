@@ -1,4 +1,4 @@
-dataset,instance,cluster,K,status,converged,certificate_is_rigorous,certificate_at_nominal_level,realised_coverage_level,delta1_coupon,rmse_vs_exact,sim_cov,n_sign_certified,signs_match_exact,min_certified_margin,mean_width,max_width,coalition_evals,elapsed_s
-air,0,0,200000,VALID,True,False,False,0.0,4.421227606912331,0.00014760186865765137,1.0,1,1,0.003987672510426275,0.03662345126136186,0.04891203952716225,2048,54.2
-air,1,1,200000,CERTIFIED,True,True,True,0.9678832730784659,0.007116726921534063,6.872318896335865e-05,1.0,3,1,0.003438012678800874,0.0333808474065387,0.0447158448889155,2048,80.2
-air,2,2,200000,BUDGET_EXHAUSTED,False,True,True,0.9522519217556775,0.022748078244322463,0.000270355316467084,1.0,3,1,0.08581601018115292,0.08487369659888179,0.10049176257764847,2048,85.8
+dataset,instance,cluster,K,status,converged,certificate_is_rigorous,certificate_at_nominal_level,realised_coverage_level,delta1_coupon,rmse_vs_exact,sim_cov,n_sign_certified,signs_match_exact,min_certified_margin,mean_width,max_width,unique_coalition_evals,unique_fraction_of_power_set,coalition_evals,elapsed_s
+air,0,0,200000,VALID,True,False,False,0.0,4.421227606912331,0.0001476018686576,1.0,1,1,0.0039876725104262,0.0366234512613618,0.0489120395271622,2048,1.0,2048,54.2
+air,1,1,200000,CERTIFIED,True,True,True,0.967883273078466,0.007116726921534,6.872318896335865e-05,1.0,3,1,0.0034380126788008,0.0333808474065387,0.0447158448889155,2048,1.0,2048,80.2
+air,2,2,200000,BUDGET_EXHAUSTED,False,True,True,0.9522519217556776,0.0227480782443224,0.000270355316467,1.0,3,1,0.0858160101811529,0.0848736965988817,0.1004917625776484,2048,1.0,2048,85.8

@@ -19,7 +19,10 @@ the paper settings) and are NOT the paper drivers.
 | `paper_air_tierB{,_rangefinite_population}_summary.csv` | `run_paper_experiments.py --only tierb` | Group-lag (M=66→11) fidelity, spec + fp |
 | `paper_ablation_wine{,_summary}.csv` | `scripts/ablation.py` | 4-tier ablation (N=20, K=1000) |
 | `paper_regime_semantics{,_summary}.csv` | `scripts/regime_semantics.py` | Per-regime driver correlations (N=20, suffixed names) |
-| `paper_reference_baselines_ablation.csv` | `scripts/run_sota_baselines.py` | OddSHAP-style (log-odds transform) + GP-quadrature references — NOT official SOTA, NOT matched-budget |
+| `paper_reference_baselines_ablation.csv` | `scripts/run_sota_baselines.py` | OddSHAP-style (log-odds transform) + GP-quadrature internal references — NOT official SOTA |
+| `paper_official_shaplEIG_{wine,air}.csv` | `scripts/run_official_shaplEIG.py` | **Official ShaplEIG** (ported from slds-lmu/shapleig@d52c09e, MIT) at matched unique-query budgets, RMSE vs exact |
+| `paper_high_dim_M30_summary.csv` | `scripts/probe_high_dim.py` | Sub-enumerative probe at M=30 (unique ≪ 2^30), sign-cert + honest non-nominal |
+| `paper_nominal_certification_{wine,air}.csv` | `scripts/probe_nominal_certification.py` | Multi-instance nominal 1−δ at K=2e5 (M=11, POST-enumerative; reports unique/attempted/fraction) |
 | `paper_width_probe{,_finite_population}.csv` | `scripts/probe_width_tightness.py` | Width law W≈318/√K (spec) and ~6.5× tighter (fp), K=2k..200k |
 | `paper_nominal_certification_{wine,air}.csv` | `scripts/probe_nominal_certification.py` | Multi-instance nominal 1−δ certification at K=2e5 (M=11, post-enumerative: 2048 unique = 2^11) |
 | `paper_high_dim_M30_summary.csv` | `scripts/probe_high_dim.py` | Sub-enumerative probe at M=30 (unique ≪ 2^30) |
