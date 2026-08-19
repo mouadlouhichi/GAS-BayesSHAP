@@ -1,0 +1,9 @@
+Highlights (Expert Systems with Applications — submitted with manuscript)
+
+• Anytime-certified Shapley estimator: bounded-linear Bayesian control variate + Neyman-stratified certifier
+• New finite-population empirical-range tightening (Theorem E): certified widths 5–34× tighter
+• Nominal 1−δ certificates on real M=11 games: 5/6 instances, 13 features, all signs validated vs exact
+• Sub-enumerative sign certification at M=30: ~2×10⁻⁴ of 2^M queried, signs match exact Shapley
+• Coupon-collector frontier separates nominal from empirical-event certification, characterized exactly
+
+(Each bullet ≤ 85 characters incl. spaces.)
