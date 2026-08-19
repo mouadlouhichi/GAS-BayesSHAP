@@ -140,9 +140,10 @@ def _eig_naive_Z(surrogate, Z: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
     """
     with torch.no_grad(), gpytorch.settings.fast_computations(False):
         post_f = surrogate.posterior(Z, observation_noise=False).mvn
-        post_y = surrogate.posterior(Z, observation_noise=True).mvn
-        covar_yz_diag = post_y.variance
         K_fz = post_f.covariance_matrix            # (n_Z, n_Z) dense
+        # var_yz = posterior predictive variance WITH observation noise
+        #          = posterior var + likelihood noise variance (one posterior)
+        covar_yz_diag = post_f.variance + surrogate.likelihood.noise_covar.noise.squeeze()
         transformed = K_fz.matmul(A.T)             # (n_Z, p)
         quad = A.matmul(transformed)               # (p, p) = A K_fz A^T
         # correction_i = t_i^T quad^{-1} t_i  for each column t_i of (A K)^T
@@ -281,13 +282,15 @@ def run_single(ds: str, X, feats, nc, i: int, B: int) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--n", type=int, default=2)
-    ap.add_argument("--budgets", default="64,256,512")
+    ap.add_argument("--n", type=int, default=1)
+    ap.add_argument("--budgets", default="64,128,256")
     ap.add_argument("--dataset", choices=["wine", "air", "both"], default="both")
     ap.add_argument("--single", nargs=2, metavar=("DATASET", "BUDGET"),
                     help="run ONE (dataset, budget) config in-process (isolation mode)")
     ap.add_argument("--inst", type=int, default=0,
                     help="instance index for --single mode (default 0)")
+    ap.add_argument("--timeout", type=int, default=1500,
+                    help="per-config wall-clock timeout in seconds (default 1500)")
     args = ap.parse_args()
 
     if not HAVE_STACK:
@@ -316,17 +319,32 @@ def main() -> int:
     # ---- parent mode: launch each (dataset, instance, budget) isolated ---- #
     budgets = [int(b) for b in args.budgets.split(",")]
     datasets = ["wine", "air"] if args.dataset == "both" else [args.dataset]
+    # M=11 -> 2^11 = 2048 unique coalitions; budgets must stay well below
+    # that (each budget B costs ~B GP refits + B full-EIG rounds, ~1-2 s/round)
+    MAX_B = 512
+    budgets = [min(b, MAX_B) for b in budgets]
+    print(f"budgets: {budgets}  (capped at {MAX_B}; ~1-2 s/round, "
+          f"so budget=256 ~= 5-8 min/config)")
 
     all_rows = []
     failures = []
     for ds in datasets:
         for i in range(args.n):
             for B in budgets:
-                # child process per config: a native crash (-11 etc.) is
-                # contained and reported, the rest of the grid still runs.
+                # child process per config: a native crash (-11 etc.) or a
+                # timeout is contained and reported; the rest still runs.
                 cmd = [sys.executable, __file__, "--single", ds, str(B),
                        "--inst", str(i)]
-                r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+                try:
+                    r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                                       timeout=args.timeout)
+                except subprocess.TimeoutExpired:
+                    failures.append({"dataset": ds, "instance": i, "budget": B,
+                                     "returncode": "TIMEOUT",
+                                     "stderr_tail": f"exceeded {args.timeout}s"})
+                    print(f"  {ds} inst {i} budget={B}: TIMEOUT "
+                          f"(>{args.timeout}s) — try a smaller budget")
+                    continue
                 f = OUT / f"official_shaplEIG_{ds}_b{B}.csv"
                 if r.returncode == 0 and f.exists():
                     row = pd.read_csv(f).iloc[0].to_dict()
