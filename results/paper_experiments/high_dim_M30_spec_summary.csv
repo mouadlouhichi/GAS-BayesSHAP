@@ -1,2 +1,2 @@
 M,K,range_mode,status,converged,certificate_is_rigorous,certificate_at_nominal_level,realised_coverage_level,delta1_coupon,unique_coalition_evals,attempted_stage2_draws,pow2_M,unique_vs_2M_ratio,rmse_vs_exact,sim_cov,n_sign_certified,signs_match_exact,min_certified_margin,mean_width,max_width,model_evals,elapsed_s
-30,100000,spec,BUDGET_EXHAUSTED,False,True,False,,,91274,99975,1073741824,8.500553667545319e-05,1.3167341383795195e-05,1.0,0,1,,3.111782677326341,3.4653529787133808,5841409,79.3
+30,100000,spec,BUDGET_EXHAUSTED,False,True,False,,,91274,99975,1073741824,8.500553667545319e-05,1.3167341383793744e-05,1.0,0,1,,3.111782677326341,3.4653529787133808,5841409,32.8
