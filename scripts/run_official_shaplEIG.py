@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Official ShaplEIG baseline on GAS-BayesSHAP games (faithful port).
+"""Official ShaplEIG baseline on GAS-BayesSHAP games (faithful port, hardened).
 
 The previous `gp_quadrature_rmse` baseline in
 `paper_reference_baselines_ablation.csv` was a *method-style* GP surrogate.
@@ -7,29 +7,34 @@ The audits asked for the **official** ShaplEIG (ICML 2026, Rundel et al.).
 The authors' public repo (github.com/slds-lmu/shapleig, MIT) was pinned at
 commit d52c09e and its core algorithm ported here:
 
-  * GP surrogate over the binary coalition space (Hamming kernel,
-    Gaussian likelihood, fit by marginal-likelihood maximisation) --
-    matches `src/xac/surrogates/gp_surrogate.py` (HammingKernelConfig +
-    MLMConfig).
+  * GP surrogate over the binary coalition space: gpytorch ExactGP with a
+    Hamming kernel + ScaleKernel + Gaussian likelihood, hyperparameters by
+    marginal-likelihood maximisation (matches the official GPSurrogate
+    HammingKernelConfig/MLMConfig family).
   * Acquisition = expected information gain about the Shapley property,
-    exactly as `_compute_eig_function_property_naive_Z` in
-    `src/xac/acquisition_functions/acquisition_functions.py`:
-        EIG(Z) = log var_yz - log(var_yz - correction),   correction =
-        inv_quad(A K_fz K_fz A^T, K_fz A^T)  (variance reduction of A f(Z)).
+    exactly as `_compute_eig_function_property_naive_Z` in the official
+    source:  EIG(Z) = log var_yz - log(var_yz - correction), with
+    correction = diag( (A K_fz)^T (A K_fz A^T)^{-1} (A K_fz) )  (variance
+    reduction of the property A f(Z) after conditioning).  Computed with
+    plain torch.linalg (no gpytorch.inv_quad / linear_operator lazy path).
   * A = the Shapley coefficient matrix from the official
-    `_get_shapley_weights` (w_in[k] = 1/(C(p-1,k-1) p) on the in-coalition
-    marginal, -w_in on the out-coalition), i.e. phi = A @ v.
+    `_get_shapley_weights` (w_in[k] = 1/(C(p-1,k-1) p)), i.e. phi = A @ v.
   * Exhaustive acquisition over all remaining coalitions; final attributions
     = A @ (GP posterior mean over all 2^M coalitions).
 
-This is a direct port of the official algorithm (not a guess), labelled
-`official_shaplEIG`; a reviewer can diff it against the pinned source.
-Unique coalition queries are counted through the GAS CoalitionOracle cache,
-so the CSV reports the *actual* query cost, matching how GAS evals are
-counted.
+Robustness (fixes a SIGSEGV observed on macOS with the torch/linear_operator
+lazy path):
+  * `torch.set_num_threads(1)` / `set_num_interop_threads(1)` at import --
+    OpenMP threading is the usual segfault trigger on macOS.
+  * EIG computed with explicit torch.linalg.solve (no native lazy ops).
+  * GP fitted with botorch's fit_gpytorch_mll (official fitter).
+  * Per-config subprocess isolation: each (dataset, budget) runs in a child
+    process; a native crash in one config is recorded as a failure row and
+    the remaining configs still complete.
 
 Usage:
-    python scripts/run_official_shaplEIG.py --n 3 --budgets 256,1024,2048
+    python scripts/run_official_shaplEIG.py --n 2 --budgets 64,256,512
+    python scripts/run_official_shaplEIG.py --single wine 256   # one config
 Outputs -> results/paper_experiments/official_shaplEIG_{wine,air}.csv
            + main_results/paper_official_shaplEIG_{wine,air}.csv
 """
@@ -38,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -46,21 +52,25 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import numpy as np
-
-# --- official ShaplEIG stack (torch/botorch/gpytorch) ---------------------- #
+# --- thread pinning FIRST (mitigates macOS OpenMP segfaults) --------------- #
 try:
     import torch
-    import gpytorch
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+except Exception:
+    pass
+
+import numpy as np  # noqa: E402
+
+try:
+    import gpytorch  # noqa: F401
     from gpytorch.distributions import MultivariateNormal
     from gpytorch.kernels import Kernel, ScaleKernel
     from gpytorch.likelihoods import GaussianLikelihood
     from gpytorch.mlls import ExactMarginalLogLikelihood
-    from linear_operator import to_linear_operator
-    from gpytorch import inv_quad
-    HAVE_OFFICIAL = True
+    HAVE_STACK = True
 except ImportError as e:  # pragma: no cover
-    HAVE_OFFICIAL = False
+    HAVE_STACK = False
     _IMPORT_ERR = e
 
 from gas_bayesshap import GASBayesSHAP  # noqa: E402
@@ -111,7 +121,6 @@ def _shapley_A(p: int, Z: torch.Tensor) -> torch.Tensor:
             if S[i]:
                 continue                     # out-coalition rows (i notin S)
             w = 1.0 / (math.comb(p - 1, k) * p)
-            # v(S u {i}) gets +w, v(S) gets -w
             Sp = S.clone(); Sp[i] = True
             idx_in = int((Z == Sp).all(dim=1).nonzero()[0].item())
             A[i, idx_in] += w
@@ -119,30 +128,30 @@ def _shapley_A(p: int, Z: torch.Tensor) -> torch.Tensor:
     return A
 
 
-def _eig_naive_Z(surrogate, Z: torch.Tensor, A: torch.Tensor,
-                 train_x: torch.Tensor, train_y: torch.Tensor) -> torch.Tensor:
+def _eig_naive_Z(surrogate, Z: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
     """Port of _compute_eig_function_property_naive_Z (official).
 
-    EIG(Z) = log(var_yz) - log(var_yz - correction), where var_yz is the
-    prior predictive variance (with observation noise) at Z and the
+    EIG(Z) = log var_yz - log(var_yz - correction), where var_yz is the
+    posterior predictive variance (with observation noise) at Z and the
     correction is the variance reduction of the property A f(Z) from
-    conditioning on the training data.
+    conditioning on the training data.  Computed with plain torch.linalg
+    (no gpytorch.inv_quad / linear_operator lazy path -- the segfault
+    source on macOS).
     """
     with torch.no_grad(), gpytorch.settings.fast_computations(False):
-        # EXACT official semantics (forward_lazy_covar): the *posterior*
-        # predictive covariance at Z, with and without observation noise.
         post_f = surrogate.posterior(Z, observation_noise=False).mvn
         post_y = surrogate.posterior(Z, observation_noise=True).mvn
         covar_yz_diag = post_y.variance
-        K_fz = post_f.covariance_matrix            # dense Z x Z posterior cov
+        K_fz = post_f.covariance_matrix            # (n_Z, n_Z) dense
         transformed = K_fz.matmul(A.T)             # (n_Z, p)
-        quad_form = A.matmul(transformed)          # (p, p)  = A K_fz A^T
-        correction = inv_quad(
-            input=quad_form,
-            inv_quad_rhs=transformed.transpose(-2, -1),
-            reduce_inv_quad=False,
-        )
-        EIG = torch.log(covar_yz_diag) - torch.log(covar_yz_diag - correction)
+        quad = A.matmul(transformed)               # (p, p) = A K_fz A^T
+        # correction_i = t_i^T quad^{-1} t_i  for each column t_i of (A K)^T
+        rhs = transformed.transpose(-2, -1)        # (p, n_Z)
+        jitter = 1e-8 * torch.eye(quad.shape[0], dtype=quad.dtype, device=quad.device)
+        sol = torch.linalg.solve(quad + jitter, rhs)   # (p, n_Z)
+        correction = (rhs * sol).sum(dim=0)        # (n_Z,)
+        EIG = torch.log(covar_yz_diag) - torch.log(
+            (covar_yz_diag - correction).clamp_min(1e-12))
         if EIG.ndim == 2:
             EIG = EIG.mean(dim=0)
         return EIG
@@ -153,21 +162,23 @@ class _GPSurrogate:
 
     def __init__(self, train_x, train_y):
         from botorch.models import SingleTaskGP
-        from botorch.models.transforms import Standardize
         kernel = ScaleKernel(HammingKernel())
         self.model = SingleTaskGP(train_x, train_y, covar_module=kernel)
         self.likelihood = self.model.likelihood
 
-    def fit(self, steps: int = 30):
+    def fit(self, steps: int = 40):
         from botorch.fit import fit_gpytorch_mll
         mll = ExactMarginalLogLikelihood(self.likelihood, self.model)
-        fit_gpytorch_mll(mll)
+        self.model.train(); self.likelihood.train()
+        with gpytorch.settings.fast_computations(False):
+            fit_gpytorch_mll(mll)
+        self.model.eval(); self.likelihood.eval()
 
     def posterior(self, Z, observation_noise=True):
         return self.model.posterior(Z, observation_noise=observation_noise)
 
 
-def run_official_shaplEIG(game_fn, x0, M, budget, seed=1301):
+def run_official_shaplEIG(game_fn, x0, M, budget, seed=1301, max_rounds=None):
     """Run the official ShaplEIG loop; return (phi, unique_queries, wall_s)."""
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -177,29 +188,28 @@ def run_official_shaplEIG(game_fn, x0, M, budget, seed=1301):
     )
     A = _shapley_A(M, Z)
 
-    archive_x = []   # evaluated coalition indices into Z
+    archive_x = []
     archive_y = []
     queried = set()
     t0 = time.time()
 
-    # initial design: empty + full coalition (2 points)
     for init_idx in (0, 2 ** M - 1):
         S = Z[init_idx].numpy().astype(bool)
         archive_x.append(init_idx)
         archive_y.append(game_fn(S))
         queried.add(init_idx)
 
-    while len(queried) < budget:
-        # fit GP on current archive
+    rounds = 0
+    max_rounds = max_rounds or (budget - len(queried))
+    while len(queried) < budget and rounds < max_rounds:
         tx = Z[torch.tensor(archive_x)]
         ty = torch.tensor(archive_y, dtype=torch.float64).unsqueeze(-1)
         if len(tx) < 2:
             break
         model = _GPSurrogate(tx, ty)
-        model.fit(steps=30)
+        model.fit(steps=40)
 
-        # acquisition over all candidates (official: exhaustive over Z)
-        scores = _eig_naive_Z(model, Z, A, tx, ty)
+        scores = _eig_naive_Z(model, Z, A)
         cand = torch.argsort(scores, descending=True)
         chosen = None
         for c in cand.tolist():
@@ -212,18 +222,27 @@ def run_official_shaplEIG(game_fn, x0, M, budget, seed=1301):
         archive_x.append(chosen)
         archive_y.append(game_fn(S))
         queried.add(chosen)
+        rounds += 1
 
-    # final attributions: A @ posterior mean over all coalitions
     tx = Z[torch.tensor(archive_x)]
     ty = torch.tensor(archive_y, dtype=torch.float64).unsqueeze(-1)
     model = _GPSurrogate(tx, ty)
     model.fit(steps=50)
     with torch.no_grad():
-        post = model.posterior(Z, observation_noise=False).mvn
-        mu = post.mean
+        mu = model.posterior(Z, observation_noise=False).mvn.mean
     phi = (A @ mu).numpy()
     wall = time.time() - t0
     return phi, len(queried), wall
+
+
+def _game_fn(fn, bg, x0):
+    oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
+                             model_tag="shaplEIG")
+
+    def game_fn(S_mask):
+        return oracle.evaluate(x0, S_mask)
+
+    return game_fn, oracle
 
 
 def run_instance(name, X, feat_names, n_clusters, i, budget, seed=1301):
@@ -233,18 +252,12 @@ def run_instance(name, X, feat_names, n_clusters, i, budget, seed=1301):
     x0 = X_te.iloc[i].values
     bg = X.sample(64, random_state=seed + i).values
 
-    def game_fn(S_mask):
-        # v(S) = mean over background of g(x_S + z_~S); full = g(x), empty = E_base
-        oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
-                                 model_tag=f"shaplEIG-{name}-{i}")
-        return oracle.evaluate(x0, S_mask)
-
-    oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
-                             model_tag=f"shaplEIG-{name}-{i}-exact")
+    game_fn, oracle = _game_fn(fn, bg, x0)
     phi_exact = exact_shapley_from_values(
         exact_game_values(oracle, x0, X.shape[1]), X.shape[1])
 
-    phi, unique, wall = run_official_shaplEIG(game_fn, x0, X.shape[1], budget, seed=seed + i)
+    phi, unique, wall = run_official_shaplEIG(game_fn, x0, X.shape[1], budget,
+                                              seed=seed + i)
     return {
         "dataset": name, "instance": i, "budget": budget,
         "rmse_vs_exact": rmse(phi, phi_exact),
@@ -254,44 +267,105 @@ def run_instance(name, X, feat_names, n_clusters, i, budget, seed=1301):
     }
 
 
+def run_single(ds: str, X, feats, nc, i: int, B: int) -> dict:
+    try:
+        return run_instance(ds, X, feats, nc, i, B)
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        traceback.print_exc()
+        return {"dataset": ds, "instance": i, "budget": B,
+                "rmse_vs_exact": float("nan"), "unique_queries": 0,
+                "source": f"ERROR: {type(e).__name__}: {str(e)[:200]}",
+                "elapsed_s": -1.0}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--n", type=int, default=3)
-    ap.add_argument("--budgets", default="256,1024,2048")
+    ap.add_argument("--n", type=int, default=2)
+    ap.add_argument("--budgets", default="64,256,512")
     ap.add_argument("--dataset", choices=["wine", "air", "both"], default="both")
+    ap.add_argument("--single", nargs=2, metavar=("DATASET", "BUDGET"),
+                    help="run ONE (dataset, budget) config in-process (isolation mode)")
+    ap.add_argument("--inst", type=int, default=0,
+                    help="instance index for --single mode (default 0)")
     args = ap.parse_args()
-    budgets = [int(b) for b in args.budgets.split(",")]
 
-    if not HAVE_OFFICIAL:
+    if not HAVE_STACK:
         print(f"official ShaplEIG stack unavailable: {_IMPORT_ERR}")
         print("install with: pip install torch botorch gpytorch linear_operator")
         return 1
 
-    t0 = time.time()
+    import pandas as pd
     OUT.mkdir(parents=True, exist_ok=True)
     MAIN.mkdir(parents=True, exist_ok=True)
+    t0 = time.time()
 
-    import pandas as pd
+    # ---- isolation mode: single config (called by the parent subprocess) -- #
+    if args.single:
+        ds, B = args.single[0], int(args.single[1])
+        if ds == "wine":
+            X, _ = load_wine(); feats, nc = WINE_FEATURES, 2
+        else:
+            X, _ = load_air_station(n_clusters=4); feats, nc = AIR_FEATURES, 4
+        row = run_single(ds, X, feats, nc, args.inst, B)
+        print(f"SINGLE {ds} inst={args.inst} budget={B}: rmse={row['rmse_vs_exact']:.5f} "
+              f"unique={row['unique_queries']} ({row['elapsed_s']}s)")
+        pd.DataFrame([row]).to_csv(OUT / f"official_shaplEIG_{ds}_b{B}.csv", index=False)
+        return 0 if row["unique_queries"] > 0 else 1
+
+    # ---- parent mode: launch each (dataset, instance, budget) isolated ---- #
+    budgets = [int(b) for b in args.budgets.split(",")]
+    datasets = ["wine", "air"] if args.dataset == "both" else [args.dataset]
+
     all_rows = []
-    for ds in (["wine", "air"] if args.dataset == "both" else [args.dataset]):
-        X, feats, nc = (load_wine(), WINE_FEATURES, 2) if ds == "wine" \
-            else (load_air_station(n_clusters=4), AIR_FEATURES, 4)
-        X, feats = X[0], feats
+    failures = []
+    for ds in datasets:
         for i in range(args.n):
             for B in budgets:
-                row = run_instance(ds, X, feats, nc, i, B)
-                all_rows.append(row)
-                print(f"  {ds} inst {i} budget={B}: rmse={row['rmse_vs_exact']:.5f} "
-                      f"unique={row['unique_queries']} ({row['elapsed_s']:.0f}s)")
-        d = pd.DataFrame([r for r in all_rows if r["dataset"] == ds])
-        d.to_csv(OUT / f"official_shaplEIG_{ds}.csv", index=False)
+                # child process per config: a native crash (-11 etc.) is
+                # contained and reported, the rest of the grid still runs.
+                cmd = [sys.executable, __file__, "--single", ds, str(B),
+                       "--inst", str(i)]
+                r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+                f = OUT / f"official_shaplEIG_{ds}_b{B}.csv"
+                if r.returncode == 0 and f.exists():
+                    row = pd.read_csv(f).iloc[0].to_dict()
+                    row["instance"] = i
+                    all_rows.append(row)
+                    print(f"  {ds} inst {i} budget={B}: "
+                          f"rmse={row['rmse_vs_exact']:.5f} "
+                          f"unique={row['unique_queries']} "
+                          f"({row['elapsed_s']:.0f}s)")
+                else:
+                    err = (r.stderr or r.stdout or "").strip().splitlines()
+                    tail = err[-3:] if err else ["<no output>"]
+                    failures.append({"dataset": ds, "instance": i, "budget": B,
+                                     "returncode": r.returncode,
+                                     "stderr_tail": " | ".join(tail)[:300]})
+                    print(f"  {ds} inst {i} budget={B}: FAILED rc={r.returncode} "
+                          f"({tail[-1] if tail else ''})")
+
+        if all_rows:
+            d = pd.DataFrame([x for x in all_rows if x["dataset"] == ds])
+            d.to_csv(OUT / f"official_shaplEIG_{ds}.csv", index=False)
+            import shutil
+            shutil.copy2(OUT / f"official_shaplEIG_{ds}.csv",
+                         MAIN / f"paper_official_shaplEIG_{ds}.csv")
+
+    if failures:
+        pd.DataFrame(failures).to_csv(OUT / "official_shaplEIG_failures.csv", index=False)
         import shutil
-        shutil.copy2(OUT / f"official_shaplEIG_{ds}.csv",
-                     MAIN / f"paper_official_shaplEIG_{ds}.csv")
+        shutil.copy2(OUT / "official_shaplEIG_failures.csv",
+                     MAIN / "paper_official_shaplEIG_failures.csv")
+        print(f"\nWARNING: {len(failures)} config(s) crashed (see "
+              f"paper_official_shaplEIG_failures.csv); if rc == -11 (SIGSEGV), "
+              f"retry with torch.set_num_threads(1) already active, or pin "
+              f"compatible versions: pip install 'torch==2.2.2' "
+              f"'gpytorch==1.11' 'linear_operator==0.5.1' (Python <=3.11).")
 
     print(f"\ndone in {time.time()-t0:.0f}s; "
           f"main_results/paper_official_shaplEIG_{{wine,air}}.csv")
-    return 0
+    return 0 if not failures else 2
 
 
 if __name__ == "__main__":
