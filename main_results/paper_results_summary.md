@@ -11,9 +11,7 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
 > `AIR_QUALITY_GAS.ipynb`) now carry a loud SMOKE-TEST banner and a
 > `PAPER_GRADE` switch (ε=0.05/budget=3000) so they cannot be mistaken for
 > the paper drivers (`scripts/run_paper_experiments.py`).
-> **Pending:** `main_results/RUN_FINAL_CERTIFICATION.ipynb` — multi-instance
-> nominal 1−δ certification at K=200k (wine+air, N=3 each), validating the
-> frontier closure on real instances with exact-sign checks.
+
 `scripts/run_paper_experiments.py`, `scripts/probe_width_tightness.py`,
 `scripts/probe_finite_population.py`, `scripts/ablation.py`,
 `scripts/run_sota_baselines.py`, `scripts/regime_semantics.py`, and the
@@ -135,10 +133,10 @@ per-instance rows include tier-4 width / sim. coverage / sign-cert)
 
 | K | Wine GAS | Wine Kernel | Air GAS | Air Kernel |
 |---|---:|---:|---:|---:|
-| 128 | **0.00430** | 0.00694 | **0.00418** | 0.01034 |
-| 256 | **0.00352** | 0.00358 | **0.00433** | 0.00529 |
-| 512 | 0.00304 | **0.00176** | 0.00312 | **0.00277** |
-| 1024 | 0.00197 | **0.00089** | 0.00314 | **0.00124** |
+| 128 | **0.00430** | 0.00576 | **0.00418** | 0.01108 |
+| 256 | 0.00352 | **0.00329** | **0.00433** | 0.00719 |
+| 512 | 0.00304 | **0.00193** | **0.00312** | 0.00322 |
+| 1024 | 0.00197 | **0.00090** | 0.00314 | **0.00147** |
 | 2048 | 0.00133 | **0.00014** | 0.00208 | **0.00026** |
 
 **Wall-clock (corrected, committed):** the curves now carry mean per-method
@@ -182,7 +180,7 @@ matrix `_get_shapley_weights` — in **pure NumPy/SciPy** (the torch stack
 crashed natively on macOS, so the port carries the identical math with no
 torch import; diffable against the pinned source).  Run on the same
 wine/air membership games at matched **unique** query budgets, RMSE vs
-exact (`paper_official_shaplEIG_{wine,air}.csv`, N=1, budgets 64/128/256):
+exact (`paper_shaplEIG_port_{wine,air}.csv`, N=1, budgets 64/128/256):
 
 | Dataset | Budget (unique) | ShaplEIG RMSE | GAS RMSE (nominal K) |
 |---|---:|---:|---:|
@@ -199,7 +197,7 @@ competitive-to-better on point-estimate RMSE (wine 256: 0.00039 vs GAS
 certificates + Neyman residual control, which ShaplEIG (Bayesian,
 non-certified) does not provide.  This is the honest official-SOTA
 comparison the audits asked for — no crashes (pure NumPy), no failures
-(`paper_official_shaplEIG_failures.csv` absent).
+(`paper_shaplEIG_port_failures.csv` absent).
 
 **Reference ablation** (`paper_reference_baselines_ablation.csv`, N=20,
 K ∈ {256,1024,2048}) from `gas_bayesshap/benchmarking/sota_baselines.py`:

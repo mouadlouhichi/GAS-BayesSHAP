@@ -40,8 +40,8 @@ ROBUSTNESS
 Usage:
     python scripts/run_official_shaplEIG.py --n 1 --budgets 64,128,256
     python scripts/run_official_shaplEIG.py --single wine 256 --inst 0
-Outputs -> results/paper_experiments/official_shaplEIG_{wine,air}.csv
-           + main_results/paper_official_shaplEIG_{wine,air}.csv
+Outputs -> results/paper_experiments/shaplEIG_port_{wine,air}.csv
+           + main_results/paper_shaplEIG_port_{wine,air}.csv
 """
 
 from __future__ import annotations
@@ -296,7 +296,7 @@ def main() -> int:
         row = run_single(ds, X, feats, nc, args.inst, B)
         print(f"SINGLE {ds} inst={args.inst} budget={B}: rmse={row['rmse_vs_exact']:.5f} "
               f"unique={row['unique_queries']} ({row['elapsed_s']}s)")
-        pd.DataFrame([row]).to_csv(OUT / f"official_shaplEIG_{ds}_b{B}.csv", index=False)
+        pd.DataFrame([row]).to_csv(OUT / f"shaplEIG_port_{ds}_b{B}.csv", index=False)
         return 0 if row["unique_queries"] > 0 else 1
 
     budgets = [min(int(b), MAX_BUDGET) for b in args.budgets.split(",")]
@@ -319,7 +319,7 @@ def main() -> int:
                                      "stderr_tail": f"exceeded {args.timeout}s"})
                     print(f"  {ds} inst {i} budget={B}: TIMEOUT (>{args.timeout}s)")
                     continue
-                f = OUT / f"official_shaplEIG_{ds}_b{B}.csv"
+                f = OUT / f"shaplEIG_port_{ds}_b{B}.csv"
                 if r.returncode == 0 and f.exists():
                     row = pd.read_csv(f).iloc[0].to_dict()
                     row["instance"] = i
@@ -338,21 +338,21 @@ def main() -> int:
 
         if all_rows:
             d = pd.DataFrame([x for x in all_rows if x["dataset"] == ds])
-            d.to_csv(OUT / f"official_shaplEIG_{ds}.csv", index=False)
+            d.to_csv(OUT / f"shaplEIG_port_{ds}.csv", index=False)
             import shutil
-            shutil.copy2(OUT / f"official_shaplEIG_{ds}.csv",
-                         MAIN / f"paper_official_shaplEIG_{ds}.csv")
+            shutil.copy2(OUT / f"shaplEIG_port_{ds}.csv",
+                         MAIN / f"paper_shaplEIG_port_{ds}.csv")
 
     if failures:
-        pd.DataFrame(failures).to_csv(OUT / "official_shaplEIG_failures.csv", index=False)
+        pd.DataFrame(failures).to_csv(OUT / "shaplEIG_port_failures.csv", index=False)
         import shutil
-        shutil.copy2(OUT / "official_shaplEIG_failures.csv",
-                     MAIN / "paper_official_shaplEIG_failures.csv")
+        shutil.copy2(OUT / "shaplEIG_port_failures.csv",
+                     MAIN / "paper_shaplEIG_port_failures.csv")
         print(f"\nWARNING: {len(failures)} config(s) failed (see "
-              f"paper_official_shaplEIG_failures.csv)")
+              f"paper_shaplEIG_port_failures.csv)")
 
     print(f"\ndone in {time.time()-t0:.0f}s; "
-          f"main_results/paper_official_shaplEIG_{{wine,air}}.csv")
+          f"main_results/paper_shaplEIG_port_{{wine,air}}.csv")
     return 0 if not failures else 2
 
 

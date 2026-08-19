@@ -108,7 +108,7 @@ cells.append(code(
     "\n"
     "print(f\"N_INST={N_INST} BUDGETS={BUDGETS} SKIP={sorted(SKIP)}\")\n"
     "print(\"NOTE: each (dataset, budget) runs in its own child process with a\"\n"
-    "      \" 1500 s timeout; failures land in paper_official_shaplEIG_failures.csv\")"
+    "      \" 1500 s timeout; failures land in paper_shaplEIG_port_failures.csv\")"
 ))
 
 cells.append(md("## A. Wine — official ShaplEIG at matched budgets"))
@@ -130,7 +130,7 @@ cells.append(code(
 cells.append(md("## C. Comparison vs GAS-BayesSHAP (matched unique evals)"))
 
 cells.append(md(
-    "Reads `paper_official_shaplEIG_{wine,air}.csv` and the GAS "
+    "Reads `paper_shaplEIG_port_{wine,air}.csv` and the GAS "
     "matched-budget curves (actual unique coalition evals) and prints a "
     "side-by-side RMSE table.  **Honest framing:** this is a point-estimate "
     "comparison at matched *unique* query cost; GAS's differentiators are "
@@ -141,7 +141,7 @@ cells.append(md(
 cells.append(code(
     "import pandas as pd\n"
     "for ds in (\"wine\", \"air\"):\n"
-    "    p = ROOT / \"main_results\" / f\"paper_official_shaplEIG_{ds}.csv\"\n"
+    "    p = ROOT / \"main_results\" / f\"paper_shaplEIG_port_{ds}.csv\"\n"
     "    if not p.exists():\n"
     "        print(f\"[{ds}] official ShaplEIG CSV missing — run A/B first\"); continue\n"
     "    s = pd.read_csv(p)\n"
@@ -165,11 +165,11 @@ cells.append(md(
     "  512 config is opt-in via BUDGETS=512 and may be slow).\n"
     "- **Full run ≈ 25–45 min** (N=1 × 2 datasets × 3 budgets {64,128,256});\n"
     "  each config runs in its own child process with a 1500 s timeout, so a\n"
-    "  crash or hang is recorded in `paper_official_shaplEIG_failures.csv`\n"
+    "  crash or hang is recorded in `paper_shaplEIG_port_failures.csv`\n"
     "  and the rest still completes.\n"
     "- **Fault isolation:** each (dataset, budget) runs in its own child\n"
     "  process with a 1500 s timeout; a crash or hang is recorded in\n"
-    "  `paper_official_shaplEIG_failures.csv` and the remaining configs\n"
+    "  `paper_shaplEIG_port_failures.csv` and the remaining configs\n"
     "  still complete.\n"
     "- **Smoke:** `N_INST=1 BUDGETS=32` (~1–2 min per dataset).\n"
     "- Budgets are **unique coalition queries** (counted via the GAS\n"
@@ -177,7 +177,7 @@ cells.append(md(
     "  `num_coalition_evals_this_call`.\n"
     "- The port is cited to the pinned official source commit; if you spot a\n"
     "  discrepancy, diff against `github.com/slds-lmu/shapleig@d52c09e`.\n"
-    "- Commit the resulting `paper_official_shaplEIG_{wine,air}.csv`."
+    "- Commit the resulting `paper_shaplEIG_port_{wine,air}.csv`."
 ))
 
 nb = nbf.v4.new_notebook(cells=cells, metadata={

@@ -1,9 +1,9 @@
 {
- "commit": "31222aef81cda03440c7b097802b780e286fecfb",
+ "commit": "23f3f459e133a6c8ee1a6fc0a5f1f64b849bfc36",
  "git_dirty": true,
- "python": "3.12.13",
+ "python": "3.11.2",
  "steps_requested": [],
- "n_artifacts": 45,
+ "n_artifacts": 47,
  "artifacts": {
   "paper_ablation_wine.csv": {
    "sha256": "21d7ab99dd94f012",
@@ -13,13 +13,9 @@
    "sha256": "07aa4979d47e9083",
    "bytes": 317
   },
-  "paper_air_instances.csv": {
-   "sha256": "8711acabad211e20",
-   "bytes": 4935
-  },
   "paper_air_matched_budget.csv": {
-   "sha256": "db5e9651013cb052",
-   "bytes": 925
+   "sha256": "85451b96bb26fc2f",
+   "bytes": 930
   },
   "paper_air_n20_budget3000_instances.csv": {
    "sha256": "12c50b470e1c6e9e",
@@ -45,10 +41,6 @@
    "sha256": "72e3d46dcc1d7c85",
    "bytes": 489
   },
-  "paper_air_summary.csv": {
-   "sha256": "ac47d7cb4f14e8a6",
-   "bytes": 486
-  },
   "paper_air_tierB_instances.csv": {
    "sha256": "3491adbf79d9c05b",
    "bytes": 1639
@@ -69,6 +61,26 @@
    "sha256": "729608deb528801d",
    "bytes": 337
   },
+  "paper_high_dim_M30_finite_population_summary.csv": {
+   "sha256": "3ce7e196e7311c36",
+   "bytes": 1394
+  },
+  "paper_high_dim_M30_spec_summary.csv": {
+   "sha256": "bb4f484142c4f899",
+   "bytes": 494
+  },
+  "paper_high_dim_M30_summary.csv": {
+   "sha256": "b4089dc988c02cc5",
+   "bytes": 1568
+  },
+  "paper_nominal_certification_air.csv": {
+   "sha256": "2484b4f66dffd211",
+   "bytes": 936
+  },
+  "paper_nominal_certification_wine.csv": {
+   "sha256": "a0254bf505174270",
+   "bytes": 958
+  },
   "paper_reference_baselines_ablation.csv": {
    "sha256": "b284b31990cd1704",
    "bytes": 12535
@@ -81,9 +93,13 @@
    "sha256": "dcda1f9420dd1f6d",
    "bytes": 255
   },
-  "paper_sota_baselines_comparison.csv": {
-   "sha256": "0791a6041b1c9ba3",
-   "bytes": 9215
+  "paper_shaplEIG_port_air.csv": {
+   "sha256": "f7a336890f930871",
+   "bytes": 752
+  },
+  "paper_shaplEIG_port_wine.csv": {
+   "sha256": "2bb277ecda279065",
+   "bytes": 755
   },
   "paper_width_probe.csv": {
    "sha256": "f5df8c60a2e6648b",
@@ -93,13 +109,9 @@
    "sha256": "ac45ac8289e60409",
    "bytes": 635
   },
-  "paper_wine_instances.csv": {
-   "sha256": "73362224db8ddba6",
-   "bytes": 5910
-  },
   "paper_wine_matched_budget.csv": {
-   "sha256": "f638240547ccadc9",
-   "bytes": 930
+   "sha256": "73a83df134566ab8",
+   "bytes": 923
   },
   "paper_wine_n20_budget3000_instances.csv": {
    "sha256": "ae4b87b596ae4c5d",
@@ -132,10 +144,6 @@
   "paper_wine_range_modes_n5_summary.csv": {
    "sha256": "0d794c3b4285aabb",
    "bytes": 272
-  },
-  "paper_wine_summary.csv": {
-   "sha256": "2bd722e0800ce89b",
-   "bytes": 512
   },
   "paper_wine_width_vs_budget.csv": {
    "sha256": "8513a6d41800581c",
@@ -182,9 +190,9 @@
    "bytes": 875
   },
   "paper_results_summary.md": {
-   "sha256": "3101093dc0f526c8",
-   "bytes": 11627
+   "sha256": "74d61045a020e2df",
+   "bytes": 19202
   }
  },
- "timestamp": "2026-08-17T21:45:11Z"
+ "timestamp": "2026-08-19T19:13:35Z"
 }
