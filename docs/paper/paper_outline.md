@@ -67,6 +67,17 @@ Information Fusion / Machine Learning (applied framing).
      honest outlier: coupon open (delta1=4.42), at_nominal=False, level 0,
      though width converged — convergence vs nominality are distinct axes,
      both reported (paper_nominal_certification_{wine,air}.csv).
+     **POST-ENUMERATIVE honesty: unique coalition evals = 2048 = 2^11 on
+     every instance (full power set cached); nominal certification at M=11
+     is enumerative-cost.**
+   - **High-dimensional sub-enumerative probe (M=30, 2^30 ~ 1.07e9):
+     sparse synthetic game, closed-form exact Shapley.**  Unique coalition
+     evals 2.1e4..2.3e5 (ratio 1.9e-5..2.1e-4 << 1); RMSE ~1e-5;
+     **3 driver features sign-certified at K=5e5 with signs validated vs
+     analytic exact**; but certificate_at_nominal_level=False everywhere
+     (coupon wall: C(29,14) ~ 7.7e7) — sub-enumerative sign certification
+     is empirical-event, not nominal.  Spec contrast at K=1e5: W 3.11 vs
+     0.092 (34x).  (paper_high_dim_M30_summary.csv)
    - Adversarial stress test (R=200): M=3 coupon closes -> nominal reached
      on 99.5% of trials; M=6 coupon open -> flag False, level 0.0 honest.
    - Tight-eps calibration (0.05..0.5, R=200, both modes): coverage 1.0.

@@ -202,11 +202,19 @@ residual control, and the empirically-validated coverage — not unconditional
 RMSE dominance over GP-BQ.  The pre-fix GP numbers (0.077–0.086) were an
 artifact of the degenerate design and are **invalid**.
 
-## Multi-instance nominal certification (K=200k, frontier closure)
+## Multi-instance nominal certification (K=200k — M=11, POST-ENUMERATIVE)
 
 `paper_nominal_certification_wine.csv`, `paper_nominal_certification_air.csv`
 (N=3 instances each, ε=0.02, budget=200000, finite-population range;
 exact ground truth per instance; **the audit's blockers 1+2 closure**)
+
+> **Honesty note (latest audit, confirmed):** every instance reports
+> `coalition_evals = 2048 = 2^11` — the *unique* coalition evaluations
+> (cache misses) saturated the full power set, so the nominal 1−δ
+> certificate closed only **after effective full enumeration**.  The
+> attempted Stage-2 budget (200k draws) was largely cache hits.  For M=11
+> the finite-population nominal certificate is therefore **post-enumerative**;
+> the sub-enumerative question is answered by the M=30 probe (below).
 
 | Dataset | Inst | Status | Converged | At nominal | Realised level | δ1 | Sign-cert. | Signs valid | Margin |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -231,6 +239,43 @@ exact ground truth per instance; **the audit's blockers 1+2 closure**)
 - **Convergence and nominality are separate axes** and both are now
   demonstrated: a run can converge on width without the coupon closing
   (air 0) or close the coupon without the width target (wine 1/2, air 2).
+
+## High-dimensional sub-enumerative certification (M=30)
+
+`paper_high_dim_M30_summary.csv` (sparse synthetic game, closed-form exact
+Shapley; 6 driver features |φ|≈0.033–0.037; 2^30 ≈ 1.07e9 infeasible;
+finite-population range; ε=0.02)
+
+| K (attempted) | Status | Conv. | Unique coal. evals | unique/2^M | Sign-cert. | Signs valid | RMSE vs exact | Mean width |
+|---:|---|---|---:|---:|---:|---:|---:|---:|
+| 20 000 | BUDGET_EXHAUSTED | ✗ | 20 802 | 1.9e-5 | 0 | ✓ | 7.9e-5 | 0.413 |
+| 50 000 | BUDGET_EXHAUSTED | ✗ | 47 644 | 4.4e-5 | 0 | ✓ | 4.0e-5 | 0.174 |
+| 100 000 | BUDGET_EXHAUSTED | ✗ | 91 274 | 8.5e-5 | 0 | ✓ | 1.3e-5 | 0.092 |
+| 500 000 | **VALID (converged)** | ✓ | 229 850 | **2.1e-4** | **3** | ✓ | 9.2e-6 | 0.038 |
+| 1 000 000 | VALID (converged) | ✓ | 229 850 | 2.1e-4 | 3 | ✓ | 9.2e-6 | 0.038 |
+
+Spec-range contrast at K=100k: mean width **3.11** vs fp **0.092** (~34×) —
+the empirical range is what makes high-dim sign certification feasible at
+all.
+
+- **Sub-enumerative sign certification IS achieved at M=30**: 3 driver
+  features certified with unique coalition evals 2.3e5 ≪ 2^30 (ratio
+  2.1e-4), every certified sign matching the analytic exact Shapley, RMSE
+  ~1e-5.  This is the first genuinely sub-enumerative (2^M infeasible)
+  sign-certified result of the project.
+- **BUT `certificate_at_nominal_level=False` at every K (realised level
+  0.0)**: the coupon-collector budget over C(29,s) pairs (up to 7.7e7 for
+  mid strata) cannot close at feasible K.  The M=30 sign certification is
+  an **empirical-event** interval under the finite-population range — tight
+  and validated, but not a nominal 1−δ anytime certificate.  This is the
+  honest scaling wall: *rigorous nominal anytime certification is
+  near-enumerative* (M ≤ ~14), while *sub-enumerative empirical-range sign
+  certification* works at M=30 with unique ≪ 2^M.
+- Combined with the M=11 result: the paper's certification story is now
+  three-part — (i) rigorous nominal certificates (M ≤ 11, post-enumerative
+  in practice), (ii) sub-enumerative empirical-range sign certification
+  (M=30, unique ≪ 2^M, non-nominal), (iii) the coupon-collector frontier
+  that separates them.
 
 ## The certification cost frontier
 
@@ -265,21 +310,26 @@ exact ground truth per instance; **the audit's blockers 1+2 closure**)
 - Near-exact Shapley recovery on real wine/air membership games (RMSE
   ~1.7–1.9e-3 at ~1.4k evals, N=50) with simultaneous coverage 1.0.
 - Certificates tighten as 1/√K with a characterised constant; the
-  finite-population refinement shrinks widths 5–9× at a rigorous realised
-  coverage level.
+  finite-population refinement shrinks widths 5–9× (and ~34× at M=30) at a
+  rigorous *realised* coverage level.
+- **Rigorous nominal 1−δ certificates on M≤11 real games** (5/6 instances,
+  13 sign-certified features, all signs validated vs exact) — explicitly
+  **post-enumerative** (2048 unique = 2^11).
+- **Sub-enumerative empirical-range sign certification at M=30** (3 driver
+  features, unique coalition evals 2.3e5 ≪ 2^30, signs validated vs the
+  analytic exact, RMSE ~1e-5) — 2^M infeasible, so this is the
+  sub-enumerative result the audits asked for; honestly non-nominal
+  (coupon wall).
 - Dominance over Monte Carlo at matched budgets; competitiveness with
   KernelSHAP at low budgets; the unique distribution-free anytime
   certificate.
 
 **Cannot yet claim:**
 - Unconditional RMSE superiority over KernelSHAP (curves contradict it).
-- Sign-certified feature discovery at the **standard budget (K=3000)**:
-  the finite-population width there is ~1.9, still above the dominant
-  attribution (~0.26).  At the **frontier budget K=2×10^5**, sign
-  certification and the nominal 1−δ certificate ARE demonstrated on
-  **5/6 real instances** (13 features total, all signs validated vs exact;
-  `paper_nominal_certification_{wine,air}.csv`), with the one outlier
-  (air inst 0, coupon open) honestly flagged at_nominal=False.
-- Statistical regime semantics: N=20 total (5–10 per regime); a per-regime
-  N≥20 run is still recommended before strong domain claims.
+- **Nominal** 1−δ certification at M=30 (coupon-collector wall: C(29,s) up
+  to 7.7e7 per cell cannot be exhausted at feasible K); nominal anytime
+  certification is near-enumerative (M ≲ 14).
+- Sign-certified feature discovery at the **standard budget (K=3000)** for
+  M=11 (fp width ~1.9 > dominant attribution ~0.26).
+- Statistical regime semantics per regime at N≥20 (currently 5–10/regime).
 - Official OddSHAP/ShaplEIG parity (method-style baselines only).
