@@ -166,18 +166,25 @@ def main() -> int:
     import pandas as pd
     d = pd.DataFrame(rows)
     tag = f"high_dim_M{args.M}"
-    # per-mode files so fp and spec runs never overwrite each other
+    # per-mode files so fp and spec runs never overwrite each other; MERGE
+    # with any existing rows so running notebook sections in any order
+    # accumulates the full grid (fix: each section used to overwrite).
     fname = f"{tag}_{args.mode}_summary.csv"
-    d.to_csv(OUT / fname, index=False)
+    oldf = OUT / fname
+    if oldf.exists():
+        d = pd.concat([pd.read_csv(oldf), d], ignore_index=True)
+        d = d.drop_duplicates(subset=["K"], keep="last").sort_values("K")
+    d.to_csv(oldf, index=False)
     import shutil
-    shutil.copy2(OUT / fname, MAIN / f"paper_{fname}")
+    shutil.copy2(oldf, MAIN / f"paper_{fname}")
 
     # combined file (concatenate existing per-mode files)
     import glob
     parts = [pd.read_csv(f) for f in sorted(OUT.glob(f"{tag}_*_summary.csv"))]
     if parts:
-        comb = pd.concat(parts, ignore_index=True).sort_values(
-            ["range_mode", "K"]).reset_index(drop=True)
+        comb = pd.concat(parts, ignore_index=True)
+        comb = comb.drop_duplicates(subset=["range_mode", "K"], keep="last")
+        comb = comb.sort_values(["range_mode", "K"]).reset_index(drop=True)
         comb.to_csv(OUT / f"{tag}_summary.csv", index=False)
         shutil.copy2(OUT / f"{tag}_summary.csv", MAIN / f"paper_{tag}_summary.csv")
 
