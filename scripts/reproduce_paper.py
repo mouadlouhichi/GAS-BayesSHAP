@@ -58,7 +58,7 @@ def sha256_file(p: Path) -> str:
     with open(p, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
-    return h.hexdigest()[:16]
+    return h.hexdigest()  # full 64-char digest (audit: was truncated to 16)
 
 
 def git_head() -> str:
@@ -90,6 +90,8 @@ def build_manifest(only: list) -> dict:
                                          capture_output=True, text=True).stdout.strip()),
         "python": sys.version.split()[0],
         "steps_requested": only,
+        "commands": [f"python scripts/{a[0]} {' '.join(a[1:])}" for a in
+                     (STEPS[k][0] for k in only if k in STEPS)],
         "n_artifacts": len(artifacts),
         "artifacts": artifacts,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

@@ -228,6 +228,18 @@ artifact of the degenerate design and are **invalid**.
 
 ## Multi-instance nominal certification (K=200k — M=11, POST-ENUMERATIVE)
 
+> **Convergence semantics (audit):** `converged` is decided on the RAW
+> residual widths (max W_res ≤ ε); the returned intervals are the larger
+> Corollary C.1 PROJECTED widths.  Runs record
+> `converged_on_raw_widths` and `converged_on_projected_widths`
+> separately; `converged=True` does NOT imply max W_proj ≤ ε.
+
+> **Convergence semantics (audit):** `converged` is decided on the RAW
+> residual widths (max W_res ≤ ε); the returned intervals are the larger
+> Corollary C.1 PROJECTED widths.  Runs therefore record
+> `converged_on_raw_widths` and `converged_on_projected_widths` separately,
+> and `converged=True` does NOT imply max W_proj ≤ ε.
+
 `paper_nominal_certification_wine.csv`, `paper_nominal_certification_air.csv`
 (N=3 instances each, ε=0.02, budget=200000, finite-population range;
 exact ground truth per instance; **the audit's blockers 1+2 closure**)
@@ -339,11 +351,11 @@ all.
 - **Rigorous nominal 1−δ certificates on M≤11 real games** (5/6 instances,
   13 sign-certified features, all signs validated vs exact) — explicitly
   **post-enumerative** (2048 unique = 2^11).
-- **Sub-enumerative empirical-range sign certification at M=30** (3 driver
+- **Sub-enumerative empirical sign separation at M=30** (3 driver
   features, unique coalition evals 2.3e5 ≪ 2^30, signs validated vs the
-  analytic exact, RMSE ~1e-5) — 2^M infeasible, so this is the
-  sub-enumerative result the audits asked for; honestly non-nominal
-  (coupon wall).
+  analytic exact, RMSE ~1e-5) — an *empirical-event interval* under the
+  finite-population range, honestly non-nominal (coupon wall); NOT called
+  sign certification in the nominal sense.
 - Dominance over Monte Carlo at matched budgets; competitiveness with
   KernelSHAP at low budgets; the unique distribution-free anytime
   certificate.

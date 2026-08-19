@@ -50,6 +50,26 @@ exact enumeration needs only 2^11=2048.  There is no query advantage."
   over (larger M, non-nominal).  No other estimator in the literature
   reports what distribution-free anytime certification *costs*.
 
+## R4. "converged=True but the returned interval exceeds ε — the stopping rule is wrong."
+
+**Attack:** your converged runs report projected widths > ε (e.g. M=30
+K=500k: max projected width ≈ 0.043 > 0.02).
+
+**Answer:** the stopping rule checks the *raw* residual widths (max
+W^res ≤ ε); the returned estimator carries the larger Corollary C.1
+*projected* widths, and the paper states this explicitly in the protocol.
+Every run records both flags (`converged_on_raw_widths` and
+`converged_on_projected_widths`); `converged` never implies max W^proj ≤ ε,
+and no certified claim is made from the raw widths alone.
+
+## R5. "The M=30 result is overstated: it is not sign certification."
+
+**Answer:** agreed and corrected. The M=30 result is now called
+*empirical sign separation* — an empirical-event interval under the
+finite-population range, validated against the analytic exact Shapley,
+with `certificate_at_nominal_level=False` throughout. "Certification" in
+the nominal sense is reserved for coupon-completed runs.
+
 ## R3. "ShaplEIG is a port, not the official library — the baseline is invalid."
 
 **Attack:** "You did not run the official ShaplEIG package, so the
@@ -65,6 +85,11 @@ comparison is not a fair SOTA benchmark."
 - It is pure NumPy/SciPy because the authors' torch/GPyTorch stack
   segfaults natively on macOS (three independent crashes, including a
   kernel death); the mathematics is unchanged.
+- A *matched unique-query* comparison is committed
+  (`paper_matched_shaplEIG_comparison.csv`): each method's actual unique
+  coalition evaluations are reported side by side at the same nominal
+  budgets, and the paper does not claim a perfectly matched unique-query
+  benchmark unless the counts agree.
 - Results: wine RMSE 0.0079/0.0079/0.0004 and air 0.0029/0.0015/0.0007 at
   64/128/256 unique queries (`paper_shaplEIG_port_{wine,air}.csv`).  We
   report it as a faithfully-ported official algorithm, clearly labelled

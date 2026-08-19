@@ -105,9 +105,15 @@ def run_instance(name, X, feat_names, n_clusters, i, K, eps, m, X_te):
         "max_width": float(np.max(W)),
         "unique_coalition_evals": unique,
         "attempted_stage2_draws": attempted,
+        "pow2_M": int(2 ** X.shape[1]),
+        "unique_vs_2M_ratio": float(unique) / float(2 ** X.shape[1]),
         "unique_fraction_of_power_set": float(unique) / float(2 ** X.shape[1]),
         "cache_hit_rate": cache_hit_rate,
         "coalition_evals": unique,  # alias kept for backward compat
+        # audit P0-1: convergence semantics -- converged is decided on RAW
+        # residual widths; report the projected-width check separately.
+        "converged_on_raw_widths": bool(r.get("converged_on_raw_widths", r.get("converged", False))),
+        "converged_on_projected_widths": bool(r.get("converged_on_projected_widths", False)),
         "elapsed_s": round(dt, 1),
     }
     print(f"  {name} inst {i}: {r['status']} conv={row['converged']} "

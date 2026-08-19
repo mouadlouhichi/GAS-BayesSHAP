@@ -56,7 +56,7 @@ def make_sparse_game(M: int, seed: int = 1301):
     """Sparse additive + pairwise game with closed-form Shapley.
 
     v(S) = 0.5 + sum_{i in S} w_i + sum_{i<j, i,j in S} w_ij,
-    with 6 driver features (|w| larger, signed) and 20 sparse pairwise
+    with 6 driver features (|w| larger, signed) and 15 sparse pairwise
     interactions among them.  Exact Shapley: phi_i = w_i + (1/2) sum_j w_ij.
     v(S) in [0.05, 0.95] so output_bounds=(0.0, 1.0) is safe.
     """
@@ -88,10 +88,33 @@ def make_sparse_game(M: int, seed: int = 1301):
     return g_c, phi_exact, w
 
 
-def run_config(M, K, eps, mode, seed=1301):
-    g_c, phi_exact, w = make_sparse_game(M, seed)
+def make_parity_game(M: int, seed: int = 1301):
+    """XOR game over a 4-feature subset (high-order interaction, no low-order
+    structure): v(S) = 0.5 + 0.25 * (-1)^{|S \cap D|} with |D|=4.  Exact
+    Shapley is zero for every feature (symmetric), so any nonzero estimated
+    attribution is pure error -- a deliberately unfavourable game for the
+    smooth GP control variate.  Used to test the residual estimator and the
+    spec-range interval under misspecification."""
+    rng = np.random.RandomState(seed)
+    D = rng.choice(M, size=4, replace=False)
+    phi_exact = np.zeros(M)
+
+    def g_c(x):
+        x = np.asarray(x, dtype=float)
+        s = int(np.sum(x[D]))
+        return 0.5 + 0.25 * (-1.0) ** s
+
+    return g_c, phi_exact, D
+
+
+def run_config(M, K, eps, mode, seed=1301, game="sparse"):
+    if game == "parity":
+        g_c, phi_exact, _ = make_parity_game(M, seed)
+    else:
+        g_c, phi_exact, w = make_sparse_game(M, seed)
     x0 = np.ones(M)
-    bg = np.zeros((64, M))  # excluded coords imputed to 0 -> v(S) = f(1_S)
+    bg = np.zeros((1, M))   # all-zero rows are identical, so B=1 defines
+                            # v(S) = f(1_S) exactly (no redundant forwards)
 
     t0 = time.time()
     eng = GASBayesSHAP(g_c, bg, output_bounds=(0.0, 1.0),
@@ -144,6 +167,7 @@ def main() -> int:
     ap.add_argument("--eps", type=float, default=0.02)
     ap.add_argument("--mode", default="finite_population",
                     choices=["finite_population", "spec", "empirical_max"])
+    ap.add_argument("--game", default="sparse", choices=["sparse", "parity"])
     args = ap.parse_args()
     budgets = [int(b) for b in args.budgets.split(",")]
 
@@ -153,7 +177,8 @@ def main() -> int:
 
     rows = []
     for K in budgets:
-        row = run_config(args.M, K, args.eps, args.mode)
+        row = run_config(args.M, K, args.eps, args.mode, game=args.game)
+        row["game"] = args.game
         rows.append(row)
         print(f"  M={row['M']} K={K:>7}: {row['status']:16s} "
               f"conv={row['converged']} at_nom={row['certificate_at_nominal_level']} "
@@ -169,11 +194,11 @@ def main() -> int:
     # per-mode files so fp and spec runs never overwrite each other; MERGE
     # with any existing rows so running notebook sections in any order
     # accumulates the full grid (fix: each section used to overwrite).
-    fname = f"{tag}_{args.mode}_summary.csv"
+    fname = f"{tag}_{args.game}_{args.mode}_summary.csv"
     oldf = OUT / fname
     if oldf.exists():
         d = pd.concat([pd.read_csv(oldf), d], ignore_index=True)
-        d = d.drop_duplicates(subset=["K"], keep="last").sort_values("K")
+        d = d.drop_duplicates(subset=["game", "K"], keep="last").sort_values("K")
     d.to_csv(oldf, index=False)
     import shutil
     shutil.copy2(oldf, MAIN / f"paper_{fname}")
@@ -183,7 +208,8 @@ def main() -> int:
     parts = [pd.read_csv(f) for f in sorted(OUT.glob(f"{tag}_*_summary.csv"))]
     if parts:
         comb = pd.concat(parts, ignore_index=True)
-        comb = comb.drop_duplicates(subset=["range_mode", "K"], keep="last")
+        gk = [c for c in ("game", "range_mode", "K") if c in comb.columns]
+        comb = comb.drop_duplicates(subset=gk, keep="last")
         comb = comb.sort_values(["range_mode", "K"]).reset_index(drop=True)
         comb.to_csv(OUT / f"{tag}_summary.csv", index=False)
         shutil.copy2(OUT / f"{tag}_summary.csv", MAIN / f"paper_{tag}_summary.csv")

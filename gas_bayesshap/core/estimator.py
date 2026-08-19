@@ -893,6 +893,17 @@ class GASBayesSHAP:
         phi_final = project_efficiency(phi_raw, float(delta_total), posterior_variances)
         certified_widths = corollary_widths(widths, posterior_variances)
         sign_cert = sign_certified(phi_final, certified_widths)
+        # Audit (P0-1): `converged` is decided in the adaptive loop on the
+        # RAW residual widths (max W_raw <= epsilon).  The RETURNED estimator
+        # carries the larger Corollary C.1 projected widths, so convergence on
+        # raw widths does NOT imply max W_proj <= epsilon.  Report both
+        # explicitly so callers/artifacts cannot conflate them.
+        converged_on_raw_widths = bool(converged) and bool(np.all(np.isfinite(widths)))
+        converged_on_projected_widths = bool(
+            converged_on_raw_widths
+            and np.all(np.isfinite(certified_widths))
+            and float(np.max(certified_widths)) <= float(epsilon)
+        )
 
         # explicit diagnostic on numerical failure (spec sections 51-52):
         # NaN/Inf estimates must never be silently returned
@@ -998,6 +1009,8 @@ class GASBayesSHAP:
                 "stage2_attempted_total": int(getattr(self, "_stage2_attempted_total", 0)),
                 "epsilon": float(epsilon),
                 "delta": float(delta),
+                "converged_on_raw_widths": bool(converged_on_raw_widths),
+                "converged_on_projected_widths": bool(converged_on_projected_widths),
                 "max_width": float(np.max(widths)) if widths.size else float("inf"),
                 "mean_width": float(np.mean(widths[np.isfinite(widths)])) if np.any(np.isfinite(widths)) else float("inf"),
                 "median_width": float(np.median(widths[np.isfinite(widths)])) if np.any(np.isfinite(widths)) else float("inf"),
