@@ -52,9 +52,10 @@ Information Fusion / Machine Learning (applied framing).
      low-budget <=256: 2.5x at K=128 air); instrumented actual call counts.
    - Ablation N=20 (K=1000): uniform 0.039 / neyman 0.007 / gp 0.071 /
      full 0.0030; tier4 width 24.7, sim cov 1.0.
-   - Baselines: OddSHAP-style log-odds (exact), ShaplEIG-style GP
-     quadrature (both non-certified, method-style), KernelSHAP,
-     SamplingSHAP; matched-budget comparison CSV.
+   - Baselines: OFFICIAL ShaplEIG (pure-NumPy port of slds-lmu/shapleig@
+     d52c09e, same math; wine 0.0079/0.0079/0.0004, air 0.0029/0.0015/
+     0.0007 RMSE at 64/128/256 unique queries), OddSHAP-style log-odds
+     (transform reference), KernelSHAP, SamplingSHAP.
    - Frontier: fp probe K=2k..200k — width ~6.5x tighter than spec;
      sign-cert of the dominant feature (|phi|=0.257) at K>=30k, signs
      validated vs exact; **nominal 1-delta CERTIFIED at K=200k** (converged,

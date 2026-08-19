@@ -462,13 +462,17 @@ confirming that the residual certifier is the bias-correction mechanism,
 not decoration.  \textbf{Baselines.}  For ShaplEIG (ICML 2026) we port the
 \emph{official} implementation from the authors' public MIT repository
 (\texttt{github.com/slds-lmu/shapleig}, pinned commit \texttt{d52c09e}):
-botorch single-task GP with Hamming kernel, the EIG acquisition
+Hamming-kernel exact GP with marginal-likelihood fit, the EIG acquisition
 \texttt{\_compute\_eig\_function\_property\_naive\_Z}, and the Shapley
-coefficient matrix \texttt{\_get\_shapley\_weights}; the port is run on the
-same membership games at matched \emph{unique} coalition-query budgets
-(counted through our oracle cache) and is diffable against the pinned
-source.  The OddSHAP-style line (exact Shapley of the log-odds game) is
-kept as a transform-sensitivity reference
+coefficient matrix \texttt{\_get\_shapley\_weights}.  The port is
+\emph{pure NumPy/SciPy} carrying the identical mathematics (the authors'
+torch stack crashed natively on our macOS machine, so we re-implemented
+the same algorithm without torch; a reviewer can diff the math against the
+pinned source).  It runs on the same membership games at matched
+\emph{unique} coalition-query budgets (counted through our oracle cache):
+wine RMSE $0.0079/0.0079/0.0004$ and air $0.0029/0.0015/0.0007$ at $64/128/
+256$ unique queries.  The OddSHAP-style line (exact Shapley of the log-odds
+game) is kept as a transform-sensitivity reference
 \emph{Comparability caveat:} the OddSHAP-style target is the log-odds game,
 whose attributions are on an unbounded scale ($|\phi^{\mathrm{odd}}|$ is
 $\sim10^2\times$ the membership-game magnitude), so its RMSE vs the
