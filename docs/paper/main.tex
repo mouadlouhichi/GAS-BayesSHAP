@@ -5,7 +5,7 @@
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{booktabs,graphicx,multirow}
 \usepackage[colorlinks]{hyperref}
-\title{GAS-BayesSHAP: Anytime-Certified Bayesian Control Variates for Shapley Estimation}
+\title{Certified Shapley Estimation with Finite-Population Empirical-Range Tightening: Anytime Guarantees from Sub-Enumeration to Nominal Certification}
 \author{}
 \date{}
 
@@ -25,22 +25,30 @@ Shapley-value estimation for black-box models faces an exponential
 combinatorial barrier and, in most practical estimators, an absence of
 distribution-free, anytime uncertainty quantification.  We propose
 GAS-BayesSHAP, which couples a bounded-linear Bayesian control variate with a
-Neyman-stratified residual certifier.  On real UCI wine and Beijing
-multi-site air-quality data ($M=11$ features, exact ground truth available),
-the estimator recovers exact Shapley values to $\sim\!1.7$--$1.9\times10^{-3}$
-RMSE over $N=50$ instances using $\sim\!1.4\times10^3$ coalition evaluations
-(about $70\%$ of the $2^{11}=2048$ exact budget), outperforming KernelSHAP
-($2.8$--$3.3\times$) and SamplingSHAP ($20$--$28\times$) at matched budgets,
-with simultaneous coverage $1.0$ validated at $R=500$ calibration trials.
-Certificates tighten as $W \approx 318/\sqrt{K}$; we prove a
-finite-population empirical-range tightening (Theorem~E) that shrinks the
-certified width by $5$--$9\times$ \emph{while preserving a rigorous coverage
-guarantee at a realised level} $1-\delta_2-\delta_1$, closing the gap between
-the conservative spec range $R_\Delta^{\mathrm{res}}=4(U-L)$ and the width
-required for sign certification.  An impossibility remark explains why the
-observed-range heuristic is not valid for generic populations, and why the
-finite-population structure of the stratified Shapley setting admits a
-rigorous alternative.
+Neyman-stratified residual certifier and an anytime empirical-Bernstein
+confidence sequence.  On real UCI wine and Beijing multi-site air-quality
+data ($M=11$ features, exact ground truth available), the estimator recovers
+exact Shapley values to $\sim\!1.7$--$1.9\times10^{-3}$ RMSE over $N=50$
+instances using $\sim\!1.4\times10^3$ coalition evaluations (about $70\%$ of
+the $2^{11}=2048$ exact budget), dominates SamplingSHAP, and validates
+simultaneous coverage $1.0$ at $R=500$ calibration trials.  The paper's
+central contribution is a three-part certification story with the cost
+frontier characterized honestly.  (i)~\emph{Nominal} $1-\delta$ anytime
+certificates are proved and demonstrated on real $M\le11$ games (5 of 6
+instances, 13 sign-certified features validated against exact ground truth);
+at this scale they are necessarily \emph{post-enumerative} (2048 unique
+coalitions $=2^{11}$).  (ii)~\emph{Sub-enumerative} sign certification is
+achieved at $M=30$ where $2^M\approx10^9$ is infeasible: a new
+finite-population empirical-range tightening (Theorem~E) shrinks certified
+widths $5$--$34\times$ and certifies driver features using only
+$\sim\!2\times10^{-4}$ of the power set, with every sign matching the exact
+Shapley value.  (iii) A coupon-collector analysis (Corollary~E) separates the
+two regimes: the empirical range is rigorous at a \emph{realised} level
+$1-\delta_2-\delta_1$, and nominal certification is reached once the
+deterministic coupon thresholds close.  An impossibility remark explains why
+the generic observed-range heuristic cannot be made distribution-free, and
+why the finite-population structure of the stratified Shapley setting admits
+a rigorous alternative.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -687,11 +695,15 @@ explicitly.}
 \label{tab:fp}
 \end{table}
 \begin{figure}[t]\centering
-% plots/width_vs_budget.png (from scripts/run_paper_experiments.py --only widths)
-\caption{Width vs budget (wine).  Spec range: $W\approx318/\sqrt K$.
-Finite-population range (Theorem~\ref{thm:E}): the same $1/\sqrt K$ law with
-a $5$--$11\times$ smaller constant, rigorous at the realised level
-$1-\delta_2-\delta_1$.  [plot: \texttt{main\_results/paper\_wine\_width\_vs\_budget.csv}]}
+\includegraphics[width=0.92\columnwidth]{plots/width_vs_budget.png}
+\caption{Certification cost frontier (wine, $M{=}11$).  The spec range
+follows $W\approx318/\sqrt K$ (dashed line); the finite-population range
+(Theorem~\ref{thm:E}) follows the same $1/\sqrt K$ law with a $\sim16\times$
+smaller constant.  The green diamond marks the first run of the project in
+which the certificate reaches the \emph{nominal} $1-\delta$ level (status
+\texttt{CERTIFIED} at $K{=}2\times10^5$, realised level $0.962$).  Generated
+from \texttt{paper\_wine\_width\_vs\_budget.csv} and
+\texttt{paper\_width\_probe\{,\_finite\_population\}.csv}.}
 \label{fig:frontier}
 \end{figure}
 
