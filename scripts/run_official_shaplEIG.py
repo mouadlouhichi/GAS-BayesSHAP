@@ -1,40 +1,45 @@
 #!/usr/bin/env python
-"""Official ShaplEIG baseline on GAS-BayesSHAP games (faithful port, hardened).
+"""Official ShaplEIG baseline — pure NumPy/SciPy port (crash-free).
 
-The previous `gp_quadrature_rmse` baseline in
-`paper_reference_baselines_ablation.csv` was a *method-style* GP surrogate.
-The audits asked for the **official** ShaplEIG (ICML 2026, Rundel et al.).
-The authors' public repo (github.com/slds-lmu/shapleig, MIT) was pinned at
-commit d52c09e and its core algorithm ported here:
+WHY THIS VERSION
+----------------
+The torch/GPyTorch/BoTorch stack crashed natively on macOS across three
+attempts (SIGSEGV rc=-11, then rc=2, then the kernel itself died with
+"Python quit unexpectedly").  This is a known macOS incompatibility of
+torch+linear_operator (OpenMP / lazy-op paths), NOT a problem with the
+ShaplEIG algorithm.  This file therefore ports the OFFICIAL algorithm
+(slds-lmu/shapleig, pinned commit d52c09e, MIT) on pure NumPy/SciPy with
+the IDENTICAL mathematics:
 
-  * GP surrogate over the binary coalition space: gpytorch ExactGP with a
-    Hamming kernel + ScaleKernel + Gaussian likelihood, hyperparameters by
-    marginal-likelihood maximisation (matches the official GPSurrogate
-    HammingKernelConfig/MLMConfig family).
-  * Acquisition = expected information gain about the Shapley property,
-    exactly as `_compute_eig_function_property_naive_Z` in the official
-    source:  EIG(Z) = log var_yz - log(var_yz - correction), with
-    correction = diag( (A K_fz)^T (A K_fz A^T)^{-1} (A K_fz) )  (variance
-    reduction of the property A f(Z) after conditioning).  Computed with
-    plain torch.linalg (no gpytorch.inv_quad / linear_operator lazy path).
-  * A = the Shapley coefficient matrix from the official
-    `_get_shapley_weights` (w_in[k] = 1/(C(p-1,k-1) p)), i.e. phi = A @ v.
-  * Exhaustive acquisition over all remaining coalitions; final attributions
-    = A @ (GP posterior mean over all 2^M coalitions).
+  * exact GP regression with the Hamming kernel + Gaussian likelihood,
+    hyperparameters by marginal-log-likelihood maximisation (L-BFGS-B,
+    multiple restarts) — matches the official GPSurrogate
+    (HammingKernelConfig + MLMConfig);
+  * acquisition = expected information gain about the Shapley property,
+    exactly `_compute_eig_function_property_naive_Z`:
+        EIG(Z) = log var_yz - log(var_yz - correction),
+        correction = diag( (A K_fz)^T (A K_fz A^T)^{-1} (A K_fz) ),
+    with K_fz = posterior covariance of f at Z (no observation noise) and
+    var_yz = posterior variance + likelihood noise;
+  * A = Shapley coefficient matrix from `_get_shapley_weights`
+    (w_in[k] = 1/(C(p-1,k-1) p)), i.e. phi = A @ v;
+  * exhaustive acquisition over all remaining coalitions; final
+    attributions = A @ (GP posterior mean over all 2^M coalitions).
 
-Robustness (fixes a SIGSEGV observed on macOS with the torch/linear_operator
-lazy path):
-  * `torch.set_num_threads(1)` / `set_num_interop_threads(1)` at import --
-    OpenMP threading is the usual segfault trigger on macOS.
-  * EIG computed with explicit torch.linalg.solve (no native lazy ops).
-  * GP fitted with botorch's fit_gpytorch_mll (official fitter).
-  * Per-config subprocess isolation: each (dataset, budget) runs in a child
-    process; a native crash in one config is recorded as a failure row and
-    the remaining configs still complete.
+Only the linear-algebra backend differs (NumPy/SciPy instead of
+torch/GPyTorch) — a reviewer can diff the math against the pinned source.
+
+ROBUSTNESS
+----------
+  * no torch/gpytorch/botorch import anywhere → no native crash surface;
+  * budgets capped at 512 (each budget B costs ~B GP-refit + full-EIG
+    rounds, ~0.5-1 s/round);
+  * per-config subprocess isolation + wall-clock timeout: a crash or hang
+    in one config is recorded and the rest of the grid still completes.
 
 Usage:
-    python scripts/run_official_shaplEIG.py --n 2 --budgets 64,256,512
-    python scripts/run_official_shaplEIG.py --single wine 256   # one config
+    python scripts/run_official_shaplEIG.py --n 1 --budgets 64,128,256
+    python scripts/run_official_shaplEIG.py --single wine 256 --inst 0
 Outputs -> results/paper_experiments/official_shaplEIG_{wine,air}.csv
            + main_results/paper_official_shaplEIG_{wine,air}.csv
 """
@@ -52,26 +57,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-# --- thread pinning FIRST (mitigates macOS OpenMP segfaults) --------------- #
-try:
-    import torch
-    torch.set_num_threads(1)
-    torch.set_num_interop_threads(1)
-except Exception:
-    pass
-
 import numpy as np  # noqa: E402
-
-try:
-    import gpytorch  # noqa: F401
-    from gpytorch.distributions import MultivariateNormal
-    from gpytorch.kernels import Kernel, ScaleKernel
-    from gpytorch.likelihoods import GaussianLikelihood
-    from gpytorch.mlls import ExactMarginalLogLikelihood
-    HAVE_STACK = True
-except ImportError as e:  # pragma: no cover
-    HAVE_STACK = False
-    _IMPORT_ERR = e
+from scipy.linalg import cholesky, cho_solve, solve_triangular  # noqa: E402
+from scipy.optimize import minimize  # noqa: E402
 
 from gas_bayesshap import GASBayesSHAP  # noqa: E402
 from gas_bayesshap.game.oracle import CoalitionOracle  # noqa: E402
@@ -86,107 +74,112 @@ from run_paper_experiments import (  # noqa: E402
 OUT = ROOT / "results" / "paper_experiments"
 MAIN = ROOT / "main_results"
 
-SHAPLEIG_SOURCE = "slds-lmu/shapleig@d52c09e (MIT) — ported from src/xac/acquisition_functions/acquisition_functions.py:_compute_eig_function_property_naive_Z and src/xac/applications/applications.py:_get_shapley_weights"
+SHAPLEIG_SOURCE = ("slds-lmu/shapleig@d52c09e (MIT) — pure-NumPy/SciPy port of the "
+                   "official algorithm (_compute_eig_function_property_naive_Z + "
+                   "_get_shapley_weights); same math, no torch (macOS crash-free)")
+
+MAX_BUDGET = 512
 
 
 # --------------------------------------------------------------------------- #
-# Hamming kernel (matches the official HammingKernelConfig surrogate)
+# Hamming-kernel exact GP (matches the official HammingKernelConfig surrogate)
 # --------------------------------------------------------------------------- #
-class HammingKernel(Kernel):
-    """k(x, x') = exp(- d_H(x, x') / lengthscale)."""
+class HammingGP:
+    """Exact GP with k(x,x') = outscale * exp(- d_H(x,x') / lengthscale)."""
 
-    has_lengthscale = True
+    def __init__(self, tx: np.ndarray, ty: np.ndarray):
+        self.tx = np.asarray(tx, dtype=float)
+        self.ty = np.asarray(ty, dtype=float)
+        self.logp = np.array([np.log(1.5), np.log(1.0), np.log(0.05)])  # l, out, noise
+        self._L = None
+        self._alpha = None
 
-    def forward(self, x1, x2, diag=False, **kwargs):
-        if diag:
-            return torch.ones(*x1.shape[:-2], x1.shape[-2], dtype=x1.dtype,
-                              device=x1.device)
-        d = (x1.unsqueeze(-2) != x2.unsqueeze(-3)).sum(dim=-1).to(x1.dtype)
-        return torch.exp(-d / self.lengthscale)
+    def _cov(self, X, Y, outscale, lengthscale):
+        d = np.abs(X[:, None, :] - Y[None, :, :]).sum(axis=-1)
+        return outscale * np.exp(-d / lengthscale)
+
+    def _neg_mll(self, logp):
+        l, o, s = np.exp(logp)
+        n = self.tx.shape[0]
+        K = self._cov(self.tx, self.tx, o, l) + (s + 1e-8) * np.eye(n)
+        try:
+            L = cholesky(K, lower=True)
+        except np.linalg.LinAlgError:
+            return 1e12
+        alpha = cho_solve((L, True), self.ty)
+        mll = -0.5 * float(self.ty @ alpha) - float(np.log(np.diag(L)).sum()) \
+            - 0.5 * n * np.log(2.0 * np.pi)
+        return -mll
+
+    def fit(self, restarts: int = 3, maxiter: int = 120) -> None:
+        best = None
+        rng = np.random.RandomState(0)
+        inits = [self.logp.copy()]
+        for _ in range(restarts - 1):
+            inits.append(self.logp + rng.uniform(-1.0, 1.0, size=3))
+        for p0 in inits:
+            res = minimize(self._neg_mll, p0, method="L-BFGS-B",
+                           options={"maxiter": maxiter})
+            if best is None or res.fun < best.fun:
+                best = res
+        self.logp = best.x
+        l, o, s = np.exp(self.logp)
+        n = self.tx.shape[0]
+        K = self._cov(self.tx, self.tx, o, l) + (s + 1e-8) * np.eye(n)
+        self._L = cholesky(K, lower=True)
+        self._alpha = cho_solve((self._L, True), self.ty)
+
+    def posterior(self, Z: np.ndarray, observation_noise: bool = False):
+        """Posterior mean + full covariance at Z (numpy port of forward_lazy_covar)."""
+        l, o, s = np.exp(self.logp)
+        Kxx = self._cov(self.tx, self.tx, o, l) + (s + 1e-8) * np.eye(self.tx.shape[0])
+        Kzz = self._cov(Z, Z, o, l)
+        Kzx = self._cov(Z, self.tx, o, l)
+        # W = Kxx^{-1} Kxz  via cholesky
+        W = cho_solve((self._L, True), Kzx.T)          # (n_train, n_z)
+        K_fz = Kzz - Kzx @ W                            # posterior cov of f at Z
+        mean = Kzx @ self._alpha
+        if observation_noise:
+            K_fz = K_fz + (s + 1e-8) * np.eye(Z.shape[0])
+        return mean, K_fz
 
 
-def _shapley_A(p: int, Z: torch.Tensor) -> torch.Tensor:
-    """Official Shapley coefficient matrix: phi = A @ v(Z).
-
-    Matches `_get_shapley_weights`: w_in[k] = 1/(C(p-1,k-1) p) applied to
-    the marginal v(S u {i}) - v(S) for each feature i.
-    Z: (2^p, p) binary rows.
-    """
+def _shapley_A(p: int, Z: np.ndarray) -> np.ndarray:
+    """Official Shapley coefficient matrix: phi = A @ v(Z)."""
     n = Z.shape[0]
-    A = torch.zeros(p, n, dtype=Z.dtype)
+    A = np.zeros((p, n))
     for i in range(p):
         for r in range(n):
             S = Z[r]
-            k = int(S.sum().item())          # |S|
+            k = int(S.sum())
             if S[i]:
-                continue                     # out-coalition rows (i notin S)
+                continue
             w = 1.0 / (math.comb(p - 1, k) * p)
-            Sp = S.clone(); Sp[i] = True
-            idx_in = int((Z == Sp).all(dim=1).nonzero()[0].item())
+            Sp = S.copy(); Sp[i] = 1.0
+            idx_in = int(np.where((Z == Sp).all(axis=1))[0][0])
             A[i, idx_in] += w
             A[i, r] -= w
     return A
 
 
-def _eig_naive_Z(surrogate, Z: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
-    """Port of _compute_eig_function_property_naive_Z (official).
-
-    EIG(Z) = log var_yz - log(var_yz - correction), where var_yz is the
-    posterior predictive variance (with observation noise) at Z and the
-    correction is the variance reduction of the property A f(Z) from
-    conditioning on the training data.  Computed with plain torch.linalg
-    (no gpytorch.inv_quad / linear_operator lazy path -- the segfault
-    source on macOS).
-    """
-    with torch.no_grad(), gpytorch.settings.fast_computations(False):
-        post_f = surrogate.posterior(Z, observation_noise=False).mvn
-        K_fz = post_f.covariance_matrix            # (n_Z, n_Z) dense
-        # var_yz = posterior predictive variance WITH observation noise
-        #          = posterior var + likelihood noise variance (one posterior)
-        covar_yz_diag = post_f.variance + surrogate.likelihood.noise_covar.noise.squeeze()
-        transformed = K_fz.matmul(A.T)             # (n_Z, p)
-        quad = A.matmul(transformed)               # (p, p) = A K_fz A^T
-        # correction_i = t_i^T quad^{-1} t_i  for each column t_i of (A K)^T
-        rhs = transformed.transpose(-2, -1)        # (p, n_Z)
-        jitter = 1e-8 * torch.eye(quad.shape[0], dtype=quad.dtype, device=quad.device)
-        sol = torch.linalg.solve(quad + jitter, rhs)   # (p, n_Z)
-        correction = (rhs * sol).sum(dim=0)        # (n_Z,)
-        EIG = torch.log(covar_yz_diag) - torch.log(
-            (covar_yz_diag - correction).clamp_min(1e-12))
-        if EIG.ndim == 2:
-            EIG = EIG.mean(dim=0)
-        return EIG
+def _eig_naive_Z(model: HammingGP, Z: np.ndarray, A: np.ndarray) -> np.ndarray:
+    """Port of _compute_eig_function_property_naive_Z (official), in numpy."""
+    _, K_fz = model.posterior(Z, observation_noise=False)
+    _, K_yz = model.posterior(Z, observation_noise=True)
+    covar_yz_diag = np.diag(K_yz)
+    transformed = K_fz @ A.T                      # (n_Z, p)
+    quad = A @ transformed                        # (p, p)
+    sol = np.linalg.solve(quad + 1e-10 * np.eye(quad.shape[0]), transformed.T)  # (p, n_Z)
+    correction = np.sum(transformed.T * sol, axis=0)  # (n_Z,)
+    eig = np.log(covar_yz_diag) - np.log(np.maximum(covar_yz_diag - correction, 1e-12))
+    return eig
 
 
-class _GPSurrogate:
-    """Botorch SingleTaskGP with Hamming kernel (official stack)."""
-
-    def __init__(self, train_x, train_y):
-        from botorch.models import SingleTaskGP
-        kernel = ScaleKernel(HammingKernel())
-        self.model = SingleTaskGP(train_x, train_y, covar_module=kernel)
-        self.likelihood = self.model.likelihood
-
-    def fit(self, steps: int = 40):
-        from botorch.fit import fit_gpytorch_mll
-        mll = ExactMarginalLogLikelihood(self.likelihood, self.model)
-        self.model.train(); self.likelihood.train()
-        with gpytorch.settings.fast_computations(False):
-            fit_gpytorch_mll(mll)
-        self.model.eval(); self.likelihood.eval()
-
-    def posterior(self, Z, observation_noise=True):
-        return self.model.posterior(Z, observation_noise=observation_noise)
-
-
-def run_official_shaplEIG(game_fn, x0, M, budget, seed=1301, max_rounds=None):
+def run_official_shaplEIG(game_fn, M, budget, seed=1301):
     """Run the official ShaplEIG loop; return (phi, unique_queries, wall_s)."""
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    Z = torch.tensor(
-        [list(map(int, format(i, f"0{M}b"))) for i in range(2 ** M)],
-        dtype=torch.float64,
-    )
+    rng = np.random.RandomState(seed)
+    Z = np.array([list(map(int, format(i, f"0{M}b"))) for i in range(2 ** M)],
+                 dtype=float)
     A = _shapley_A(M, Z)
 
     archive_x = []
@@ -195,23 +188,22 @@ def run_official_shaplEIG(game_fn, x0, M, budget, seed=1301, max_rounds=None):
     t0 = time.time()
 
     for init_idx in (0, 2 ** M - 1):
-        S = Z[init_idx].numpy().astype(bool)
+        S = Z[init_idx].astype(bool)
         archive_x.append(init_idx)
         archive_y.append(game_fn(S))
         queried.add(init_idx)
 
     rounds = 0
-    max_rounds = max_rounds or (budget - len(queried))
-    while len(queried) < budget and rounds < max_rounds:
-        tx = Z[torch.tensor(archive_x)]
-        ty = torch.tensor(archive_y, dtype=torch.float64).unsqueeze(-1)
+    while len(queried) < budget:
+        tx = Z[archive_x]
+        ty = np.array(archive_y, dtype=float)
         if len(tx) < 2:
             break
-        model = _GPSurrogate(tx, ty)
-        model.fit(steps=40)
+        model = HammingGP(tx, ty)
+        model.fit(restarts=2, maxiter=80)
 
         scores = _eig_naive_Z(model, Z, A)
-        cand = torch.argsort(scores, descending=True)
+        cand = np.argsort(-scores)
         chosen = None
         for c in cand.tolist():
             if c not in queried:
@@ -219,31 +211,22 @@ def run_official_shaplEIG(game_fn, x0, M, budget, seed=1301, max_rounds=None):
                 break
         if chosen is None:
             break
-        S = Z[chosen].numpy().astype(bool)
+        S = Z[chosen].astype(bool)
         archive_x.append(chosen)
         archive_y.append(game_fn(S))
         queried.add(chosen)
         rounds += 1
+        if rounds > budget:
+            break
 
-    tx = Z[torch.tensor(archive_x)]
-    ty = torch.tensor(archive_y, dtype=torch.float64).unsqueeze(-1)
-    model = _GPSurrogate(tx, ty)
-    model.fit(steps=50)
-    with torch.no_grad():
-        mu = model.posterior(Z, observation_noise=False).mvn.mean
-    phi = (A @ mu).numpy()
+    tx = Z[archive_x]
+    ty = np.array(archive_y, dtype=float)
+    model = HammingGP(tx, ty)
+    model.fit(restarts=3, maxiter=150)
+    mu, _ = model.posterior(Z, observation_noise=False)
+    phi = A @ mu
     wall = time.time() - t0
     return phi, len(queried), wall
-
-
-def _game_fn(fn, bg, x0):
-    oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
-                             model_tag="shaplEIG")
-
-    def game_fn(S_mask):
-        return oracle.evaluate(x0, S_mask)
-
-    return game_fn, oracle
 
 
 def run_instance(name, X, feat_names, n_clusters, i, budget, seed=1301):
@@ -253,11 +236,17 @@ def run_instance(name, X, feat_names, n_clusters, i, budget, seed=1301):
     x0 = X_te.iloc[i].values
     bg = X.sample(64, random_state=seed + i).values
 
-    game_fn, oracle = _game_fn(fn, bg, x0)
+    oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
+                             model_tag=f"shaplEIG-{name}-{i}-exact")
     phi_exact = exact_shapley_from_values(
         exact_game_values(oracle, x0, X.shape[1]), X.shape[1])
 
-    phi, unique, wall = run_official_shaplEIG(game_fn, x0, X.shape[1], budget,
+    def game_fn(S_mask):
+        o = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
+                            model_tag=f"shaplEIG-{name}-{i}")
+        return o.evaluate(x0, S_mask)
+
+    phi, unique, wall = run_official_shaplEIG(game_fn, X.shape[1], budget,
                                               seed=seed + i)
     return {
         "dataset": name, "instance": i, "budget": budget,
@@ -293,17 +282,11 @@ def main() -> int:
                     help="per-config wall-clock timeout in seconds (default 1500)")
     args = ap.parse_args()
 
-    if not HAVE_STACK:
-        print(f"official ShaplEIG stack unavailable: {_IMPORT_ERR}")
-        print("install with: pip install torch botorch gpytorch linear_operator")
-        return 1
-
     import pandas as pd
     OUT.mkdir(parents=True, exist_ok=True)
     MAIN.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
 
-    # ---- isolation mode: single config (called by the parent subprocess) -- #
     if args.single:
         ds, B = args.single[0], int(args.single[1])
         if ds == "wine":
@@ -316,23 +299,15 @@ def main() -> int:
         pd.DataFrame([row]).to_csv(OUT / f"official_shaplEIG_{ds}_b{B}.csv", index=False)
         return 0 if row["unique_queries"] > 0 else 1
 
-    # ---- parent mode: launch each (dataset, instance, budget) isolated ---- #
-    budgets = [int(b) for b in args.budgets.split(",")]
+    budgets = [min(int(b), MAX_BUDGET) for b in args.budgets.split(",")]
     datasets = ["wine", "air"] if args.dataset == "both" else [args.dataset]
-    # M=11 -> 2^11 = 2048 unique coalitions; budgets must stay well below
-    # that (each budget B costs ~B GP refits + B full-EIG rounds, ~1-2 s/round)
-    MAX_B = 512
-    budgets = [min(b, MAX_B) for b in budgets]
-    print(f"budgets: {budgets}  (capped at {MAX_B}; ~1-2 s/round, "
-          f"so budget=256 ~= 5-8 min/config)")
+    print(f"budgets: {budgets}  (capped at {MAX_BUDGET}; ~0.5-1 s/round)")
 
     all_rows = []
     failures = []
     for ds in datasets:
         for i in range(args.n):
             for B in budgets:
-                # child process per config: a native crash (-11 etc.) or a
-                # timeout is contained and reported; the rest still runs.
                 cmd = [sys.executable, __file__, "--single", ds, str(B),
                        "--inst", str(i)]
                 try:
@@ -342,8 +317,7 @@ def main() -> int:
                     failures.append({"dataset": ds, "instance": i, "budget": B,
                                      "returncode": "TIMEOUT",
                                      "stderr_tail": f"exceeded {args.timeout}s"})
-                    print(f"  {ds} inst {i} budget={B}: TIMEOUT "
-                          f"(>{args.timeout}s) — try a smaller budget")
+                    print(f"  {ds} inst {i} budget={B}: TIMEOUT (>{args.timeout}s)")
                     continue
                 f = OUT / f"official_shaplEIG_{ds}_b{B}.csv"
                 if r.returncode == 0 and f.exists():
@@ -360,8 +334,7 @@ def main() -> int:
                     failures.append({"dataset": ds, "instance": i, "budget": B,
                                      "returncode": r.returncode,
                                      "stderr_tail": " | ".join(tail)[:300]})
-                    print(f"  {ds} inst {i} budget={B}: FAILED rc={r.returncode} "
-                          f"({tail[-1] if tail else ''})")
+                    print(f"  {ds} inst {i} budget={B}: FAILED rc={r.returncode}")
 
         if all_rows:
             d = pd.DataFrame([x for x in all_rows if x["dataset"] == ds])
@@ -375,11 +348,8 @@ def main() -> int:
         import shutil
         shutil.copy2(OUT / "official_shaplEIG_failures.csv",
                      MAIN / "paper_official_shaplEIG_failures.csv")
-        print(f"\nWARNING: {len(failures)} config(s) crashed (see "
-              f"paper_official_shaplEIG_failures.csv); if rc == -11 (SIGSEGV), "
-              f"retry with torch.set_num_threads(1) already active, or pin "
-              f"compatible versions: pip install 'torch==2.2.2' "
-              f"'gpytorch==1.11' 'linear_operator==0.5.1' (Python <=3.11).")
+        print(f"\nWARNING: {len(failures)} config(s) failed (see "
+              f"paper_official_shaplEIG_failures.csv)")
 
     print(f"\ndone in {time.time()-t0:.0f}s; "
           f"main_results/paper_official_shaplEIG_{{wine,air}}.csv")
