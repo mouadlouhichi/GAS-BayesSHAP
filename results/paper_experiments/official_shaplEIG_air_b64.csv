@@ -1,0 +1,2 @@
+dataset,instance,budget,rmse_vs_exact,unique_queries,source,elapsed_s
+air,0,64,0.0029026706406521147,64,"slds-lmu/shapleig@d52c09e (MIT) — pure-NumPy/SciPy port of the official algorithm (_compute_eig_function_property_naive_Z + _get_shapley_weights); same math, no torch (macOS crash-free)",12.9
