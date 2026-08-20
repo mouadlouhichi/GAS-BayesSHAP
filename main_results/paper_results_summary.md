@@ -191,13 +191,17 @@ exact (`paper_shaplEIG_port_{wine,air}.csv`, N=1, budgets 64/128/256):
 | Air | 128 | 0.00151 | 0.00433 (K=256) |
 | Air | 256 | 0.00073 | 0.00208 (K=2048) |
 
-**Honest reading:** at matched unique budgets, official ShaplEIG is
-competitive-to-better on point-estimate RMSE (wine 256: 0.00039 vs GAS
-0.00304).  GAS's differentiators remain the distribution-free anytime
-certificates + Neyman residual control, which ShaplEIG (Bayesian,
-non-certified) does not provide.  This is the honest official-SOTA
-comparison the audits asked for — no crashes (pure NumPy), no failures
-(`paper_shaplEIG_port_failures.csv` absent).
+**Honest reading (matched comparison, `paper_matched_shaplEIG_comparison.csv`,
+N=2):** at equal *nominal* budgets {64,128,256}, GAS uses 4–7× more
+*unique* evaluations (337–507 vs ShaplEIG's 64–256) because of its fixed
+Stage-1 GP design + exact singleton init, so the two methods are **not**
+unique-query-matched at these budgets (`matched_unique=False` everywhere)
+and we do not claim they are.  On point-estimate RMSE at a given query
+count, ShaplEIG is competitive-to-better (e.g. wine K=256: GAS 0.00213 @
+498 unique vs ShaplEIG 0.00039 @ 256).  GAS's differentiators remain the
+distribution-free anytime certificates + Neyman residual control, which
+ShaplEIG (Bayesian, non-certified) does not provide.  This is the honest
+official-SOTA comparison the audits asked for — no crashes (pure NumPy).
 
 **Reference ablation** (`paper_reference_baselines_ablation.csv`, N=20,
 K ∈ {256,1024,2048}) from `gas_bayesshap/benchmarking/sota_baselines.py`:
