@@ -99,17 +99,26 @@ class HammingGP:
         return outscale * np.exp(-d / lengthscale)
 
     def _neg_mll(self, logp):
+        # Clip hyperparameters to a sane range so L-BFGS-B cannot drive them
+        # to NaN/inf (which makes scipy.linalg.cholesky raise ValueError, not
+        # LinAlgError -- the crash seen in the user's run at large caps).
+        logp = np.clip(logp, -12.0, 12.0)
         l, o, s = np.exp(logp)
         n = self.tx.shape[0]
+        if not (np.isfinite(l) and np.isfinite(o) and np.isfinite(s) and o > 0):
+            return 1e12
         K = self._cov(self.tx, self.tx, o, l) + (s + 1e-8) * np.eye(n)
         try:
-            L = cholesky(K, lower=True)
-        except np.linalg.LinAlgError:
+            L = cholesky(K, lower=True, check_finite=False)
+        except (np.linalg.LinAlgError, ValueError):
             return 1e12
-        alpha = cho_solve((L, True), self.ty)
-        mll = -0.5 * float(self.ty @ alpha) - float(np.log(np.diag(L)).sum()) \
-            - 0.5 * n * np.log(2.0 * np.pi)
-        return -mll
+        try:
+            alpha = cho_solve((L, True), self.ty)
+            mll = -0.5 * float(self.ty @ alpha) - float(np.log(np.diag(L)).sum()) \
+                - 0.5 * n * np.log(2.0 * np.pi)
+        except (ValueError, FloatingPointError):
+            return 1e12
+        return float(-mll) if np.isfinite(mll) else 1e12
 
     def fit(self, restarts: int = 3, maxiter: int = 120) -> None:
         best = None
@@ -118,10 +127,15 @@ class HammingGP:
         for _ in range(restarts - 1):
             inits.append(self.logp + rng.uniform(-1.0, 1.0, size=3))
         for p0 in inits:
-            res = minimize(self._neg_mll, p0, method="L-BFGS-B",
-                           options={"maxiter": maxiter})
-            if best is None or res.fun < best.fun:
+            try:
+                res = minimize(self._neg_mll, p0, method="L-BFGS-B",
+                               options={"maxiter": maxiter})
+            except (ValueError, FloatingPointError, RuntimeError):
+                continue
+            if best is None or (np.isfinite(res.fun) and res.fun < best.fun):
                 best = res
+        if best is None:
+            return  # keep current (clipped) hyperparameters
         self.logp = best.x
         l, o, s = np.exp(self.logp)
         n = self.tx.shape[0]

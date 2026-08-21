@@ -132,13 +132,22 @@ def main() -> int:
     MAIN.mkdir(parents=True, exist_ok=True)
 
     rows = []
+    failures = []
     for ds in (["wine", "air"] if args.dataset == "both" else [args.dataset]):
         X, feats, nc = (load_wine(), WINE_FEATURES, 2) if ds == "wine" \
             else (load_air_station(n_clusters=4), AIR_FEATURES, 4)
         X = X[0]
         for i in range(args.n):
             for cap in caps:
-                row = run_one(ds, X, feats, nc, i, cap, seed=1301)
+                try:
+                    row = run_one(ds, X, feats, nc, i, cap, seed=1301)
+                except Exception as e:  # noqa: BLE001 -- one config must not kill the run
+                    import traceback
+                    traceback.print_exc()
+                    failures.append({"dataset": ds, "instance": i, "unique_cap": cap,
+                                     "error": f"{type(e).__name__}: {str(e)[:200]}"})
+                    print(f"  {ds} inst {i} cap={cap}: FAILED {type(e).__name__}")
+                    continue
                 rows.append(row)
                 print(f"  {ds} inst {i} cap={cap}: gas={row['gas_rmse']:.5f} "
                       f"(unique={row['gas_unique_evals']}) vs "
@@ -152,6 +161,12 @@ def main() -> int:
     import shutil
     shutil.copy2(OUT / "unique_capped_shaplEIG.csv",
                  MAIN / "paper_unique_capped_shaplEIG.csv")
+    if failures:
+        pd.DataFrame(failures).to_csv(OUT / "unique_capped_shaplEIG_failures.csv", index=False)
+        shutil.copy2(OUT / "unique_capped_shaplEIG_failures.csv",
+                     MAIN / "paper_unique_capped_shaplEIG_failures.csv")
+        print(f"\nWARNING: {len(failures)} config(s) failed — see "
+              f"paper_unique_capped_shaplEIG_failures.csv")
 
     hon = d[d.cap_honored]
     print("\n=== mean over instances (cap-honored rows only) ===")
