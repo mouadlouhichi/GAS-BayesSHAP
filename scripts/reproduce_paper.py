@@ -50,6 +50,14 @@ STEPS = {
     "probe_spec": (["probe_width_tightness.py", "--range-mode", "spec"], "paper_width_probe"),
     "probe_fp":  (["probe_width_tightness.py", "--range-mode", "finite_population"], "paper_width_probe_finite_population"),
     "stress": (["stress_finite_population.py", "--trials", "200"], "paper_stress_finite_population"),
+    "unique_capped": (["run_unique_capped_shaplEIG.py", "--n", "10", "--caps", "64,128,256"],
+                      "paper_unique_capped_shaplEIG"),
+    "regimes20": (["regime_semantics.py", "--per-regime", "20", "--clusters", "4",
+                   "--eps", "0.05", "--budget", "3000"], "paper_regime_semantics"),
+    "hard_threshold": (["probe_high_dim.py", "--M", "30", "--budgets", "50000,100000",
+                        "--game", "threshold", "--mode", "spec"], "paper_high_dim_M30_threshold"),
+    "hard_unanimity": (["probe_high_dim.py", "--M", "30", "--budgets", "50000,100000",
+                        "--game", "unanimity", "--mode", "spec"], "paper_high_dim_M30_unanimity"),
 }
 
 

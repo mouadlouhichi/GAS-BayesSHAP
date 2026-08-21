@@ -7,6 +7,9 @@ certificate closed only after full enumeration.  This probe answers the
 audit's decisive question at a dimension where 2^M is infeasible:
 
   * M = 30 (2^30 ~ 1.07e9) -- exact enumeration impossible;
+  * games: sparse (additive+pairwise), parity (XOR), threshold
+    (t-out-of-k), unanimity (k-way AND) -- all with closed-form
+    exact Shapley values;
   * sparse synthetic game with CLOSED-FORM exact Shapley values
     (additive + sparse pairwise interactions), so RMSE and sign
     validation remain checkable;
@@ -107,9 +110,49 @@ def make_parity_game(M: int, seed: int = 1301):
     return g_c, phi_exact, D
 
 
+def make_threshold_game(M: int, k: int = 4, t: int = 2, seed: int = 1301):
+    """Threshold (t-out-of-k) game over a k-feature subset D:
+    v(S) = 0.5 + 0.25 * 1[|S cap D| >= t].  The function is symmetric in D,
+    so the exact Shapley value is uniform over the k drivers:
+    phi_i = 0.25 * (f(k) - f(0)) / k = 0.25/k for i in D, 0 otherwise.
+    A hard (non-smooth, non-additive) game for the GP control variate."""
+    rng = np.random.RandomState(seed)
+    D = rng.choice(M, size=k, replace=False)
+    f = lambda s: 1.0 if s >= t else 0.0
+    phi_exact = np.zeros(M)
+    phi_exact[D] = 0.25 * (f(k) - f(0)) / k
+
+    def g_c(x):
+        x = np.asarray(x, dtype=float)
+        return 0.5 + 0.25 * float(np.sum(x[D]) >= t)
+
+    return g_c, phi_exact, D
+
+
+def make_unanimity_game(M: int, k: int = 4, seed: int = 1301):
+    """Unanimity game over a k-feature subset D:
+    v(S) = 0.5 + 0.5 * 1[S supseteq D].  Exact Shapley: phi_i = 0.5/k on D,
+    0 otherwise.  The hardest interaction structure for smooth surrogates
+    (a pure k-way AND)."""
+    rng = np.random.RandomState(seed)
+    D = rng.choice(M, size=k, replace=False)
+    phi_exact = np.zeros(M)
+    phi_exact[D] = 0.5 / k
+
+    def g_c(x):
+        x = np.asarray(x, dtype=float)
+        return 0.5 + 0.5 * float(np.all(x[D] == 1.0))
+
+    return g_c, phi_exact, D
+
+
 def run_config(M, K, eps, mode, seed=1301, game="sparse"):
     if game == "parity":
         g_c, phi_exact, _ = make_parity_game(M, seed)
+    elif game == "threshold":
+        g_c, phi_exact, _ = make_threshold_game(M, seed=seed)
+    elif game == "unanimity":
+        g_c, phi_exact, _ = make_unanimity_game(M, seed=seed)
     else:
         g_c, phi_exact, w = make_sparse_game(M, seed)
     x0 = np.ones(M)
@@ -167,7 +210,8 @@ def main() -> int:
     ap.add_argument("--eps", type=float, default=0.02)
     ap.add_argument("--mode", default="finite_population",
                     choices=["finite_population", "spec", "empirical_max"])
-    ap.add_argument("--game", default="sparse", choices=["sparse", "parity"])
+    ap.add_argument("--game", default="sparse",
+                    choices=["sparse", "parity", "threshold", "unanimity"])
     args = ap.parse_args()
     budgets = [int(b) for b in args.budgets.split(",")]
 

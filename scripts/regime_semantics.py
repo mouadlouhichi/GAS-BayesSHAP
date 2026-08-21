@@ -63,9 +63,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=10)
     ap.add_argument("--clusters", type=int, default=4)
+    ap.add_argument("--per-regime", type=int, default=0,
+                    help="require >= this many instances per NAMED regime; "
+                         "overrides --n (instances cycle evenly over clusters, "
+                         "so n = per_regime * n_clusters)")
     ap.add_argument("--budget", type=int, default=1500)
     ap.add_argument("--eps", type=float, default=0.05)
     args = ap.parse_args()
+    if args.per_regime > 0:
+        args.n = args.per_regime * args.clusters
+        print(f"[regime] --per-regime {args.per_regime} -> n={args.n} "
+              f"({args.per_regime} per cluster/regime)")
 
     df = pd.read_csv(ROOT / "data" / "Beijing_MultiSite_AirQuality.csv")
     st = df["station"].value_counts().index[0]
