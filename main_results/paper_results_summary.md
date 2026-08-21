@@ -295,27 +295,28 @@ finite-population range; ε=0.02)
 | 1 000 000 | VALID (converged) | ✓ | 229 850 | 2.1e-4 | 3 | ✓ | 9.2e-6 | 0.038 |
 
 Spec-range contrast at K=100k: mean width **3.11** vs fp **0.092** (~34×) —
-the empirical range is what makes high-dim sign certification feasible at
+the empirical range is what makes high-dim sign separation feasible at
 all.
 
-- **Sub-enumerative sign certification IS achieved at M=30**: 3 driver
-  features certified with unique coalition evals 2.3e5 ≪ 2^30 (ratio
-  2.1e-4), every certified sign matching the analytic exact Shapley, RMSE
+- **Sub-enumerative empirical sign separation IS achieved at M=30**: 3
+  driver features separated with unique coalition evals 2.3e5 ≪ 2^30
+  (ratio 2.1e-4), every sign matching the analytic exact Shapley, RMSE
   ~1e-5.  This is the first genuinely sub-enumerative (2^M infeasible)
-  sign-certified result of the project.
+  sign-separation result of the project.
 - **BUT `certificate_at_nominal_level=False` at every K (realised level
   0.0)**: the coupon-collector budget over C(29,s) pairs (up to 7.7e7 for
-  mid strata) cannot close at feasible K.  The M=30 sign certification is
-  an **empirical-event** interval under the finite-population range — tight
-  and validated, but not a nominal 1−δ anytime certificate.  This is the
-  honest scaling wall: *rigorous nominal anytime certification is
+  mid strata) cannot close at feasible K.  The M=30 result is an
+  **empirical-event** interval under the finite-population range — tight
+  and exact-validated, but NOT a nominal 1−δ anytime certificate (and not
+  called "certification" in the nominal sense anywhere in the paper).  This
+  is the honest scaling wall: *rigorous nominal anytime certification is
   near-enumerative* (M ≤ ~14), while *sub-enumerative empirical-range sign
-  certification* works at M=30 with unique ≪ 2^M.
+  separation* works at M=30 with unique ≪ 2^M.
 - Combined with the M=11 result: the paper's certification story is now
   three-part — (i) rigorous nominal certificates (M ≤ 11, post-enumerative
-  in practice), (ii) sub-enumerative empirical-range sign certification
-  (M=30, unique ≪ 2^M, non-nominal), (iii) the coupon-collector frontier
-  that separates them.
+  in practice), (ii) sub-enumerative empirical sign separation (M=30,
+  unique ≪ 2^M, non-nominal), (iii) the coupon-collector frontier that
+  separates them.
 
 ## The certification cost frontier
 
