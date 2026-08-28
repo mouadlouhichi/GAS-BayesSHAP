@@ -1,10 +1,10 @@
 {
- "commit": "3250f7db3c57383a5da93c69b990ab0fba746993",
- "git_dirty": false,
+ "commit": "f57f6db6d199a159baed74448555e2e585bca51c",
+ "git_dirty": true,
  "python": "3.11.2",
  "steps_requested": [],
  "commands": [],
- "n_artifacts": 48,
+ "n_artifacts": 54,
  "artifacts": {
   "paper_ablation_wine.csv": {
    "sha256": "21d7ab99dd94f012fd8cbba94ea61a506520adf01c9ace926befc83de00553df",
@@ -75,8 +75,20 @@
    "bytes": 494
   },
   "paper_high_dim_M30_summary.csv": {
-   "sha256": "2645041022669edc8bd3b051a683959e0aa0e8a71122ed35075660ddb6247a6e",
-   "bytes": 1970
+   "sha256": "0dfed7ab5caf0f44c18571332f4806c1f30f7edef646f91ae38a676c2b481ad5",
+   "bytes": 2694
+  },
+  "paper_high_dim_M30_threshold_spec_summary.csv": {
+   "sha256": "bb033bf854570024e505bb7408ced244ac63dc18b5a7737cdeb4fbdee06e940c",
+   "bytes": 688
+  },
+  "paper_high_dim_M30_unanimity_spec_summary.csv": {
+   "sha256": "6553c96d809aaaedd4e7e3a020c5b2fb9b069d703590a272e052c6aef1bd609a",
+   "bytes": 690
+  },
+  "paper_matched_shaplEIG_comparison.csv": {
+   "sha256": "7e2a53ae4b8ef15e77d1cfdf7471c90ebc7395712b01a333746b407d2b7e8321",
+   "bytes": 3397
   },
   "paper_nominal_certification_air.csv": {
    "sha256": "8d0a95a2cfd245b6ed335b3c1370f1991b7094e3f50a0e20d5e69340d9bd471b",
@@ -91,12 +103,12 @@
    "bytes": 12535
   },
   "paper_regime_semantics.csv": {
-   "sha256": "1897759447135dc71ddae291789ad9b86cf037e6bf037c40f23eb43f9e114f73",
-   "bytes": 1524
+   "sha256": "773c6c0bcb6b235b5ba85e3f66de85b2085c62675511c8ab5a150cba53e5d411",
+   "bytes": 5945
   },
   "paper_regime_semantics_summary.csv": {
-   "sha256": "dcda1f9420dd1f6d05811298d5c2234794459d50e7c31b5405db52832d5f47e5",
-   "bytes": 255
+   "sha256": "e213ea7984467932f42ab7d78482000e325207337d2159b8239e22eaa2ba283d",
+   "bytes": 256
   },
   "paper_shaplEIG_port_air.csv": {
    "sha256": "f7a336890f930871402c867b19b896d9b0df81be57ea2f316e2ce83deb04e685",
@@ -105,6 +117,10 @@
   "paper_shaplEIG_port_wine.csv": {
    "sha256": "2bb277ecda2790656954571f460858ebae13eed1723937c1d99471e90503d77b",
    "bytes": 755
+  },
+  "paper_unique_capped_shaplEIG.csv": {
+   "sha256": "c4ec11a8d595f60b4bac638fa710eb0115ad64209bb207dc467e3d9b7bcf67fe",
+   "bytes": 11341
   },
   "paper_width_probe.csv": {
    "sha256": "f5df8c60a2e6648b5a1b8c761a51b288d6f8b2de955aacb49707dd70d4f24df2",
@@ -195,9 +211,25 @@
    "bytes": 875
   },
   "paper_results_summary.md": {
-   "sha256": "90a66f93d9fb36119585d57d5b8ae46aad3f2dda25a400dca6eb1f7df742bc36",
-   "bytes": 19896
+   "sha256": "170a7cbc4c35aeca8820b8b1c2e796527f8bebbbba84ee158a974f8b1b06d0a1",
+   "bytes": 23618
+  },
+  "pytest_output.txt": {
+   "sha256": "5664aae1fd43e014d6a21bd5c7e9e83509ffc1e95a95486ac34a52bc9d1695ba",
+   "bytes": 271
+  },
+  "math_validation_output.txt": {
+   "sha256": "5aa0cb5183d6ad820c424a16926ad341ce687f13a9483b4c8cda1bfb867b3ae7",
+   "bytes": 383
   }
  },
- "timestamp": "2026-08-19T21:27:07Z"
+ "timestamp": "2026-08-28T15:03:08Z",
+ "tests": {
+  "passed": 202,
+  "failed": 0,
+  "artifact": "pytest_output.txt"
+ },
+ "math_validation": {
+  "artifact": "math_validation_output.txt"
+ }
 }
