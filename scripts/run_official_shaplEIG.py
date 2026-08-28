@@ -250,15 +250,17 @@ def run_instance(name, X, feat_names, n_clusters, i, budget, seed=1301):
     x0 = X_te.iloc[i].values
     bg = X.sample(64, random_state=seed + i).values
 
-    oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
-                             model_tag=f"shaplEIG-{name}-{i}-exact")
+    oracle_exact = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
+                                   model_tag=f"shaplEIG-{name}-{i}-exact")
     phi_exact = exact_shapley_from_values(
-        exact_game_values(oracle, x0, X.shape[1]), X.shape[1])
+        exact_game_values(oracle_exact, x0, X.shape[1]), X.shape[1])
+
+    # Persistent oracle for fair timing (audit 6.3) — no per-query rebuild
+    shapl_oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
+                                   model_tag=f"shaplEIG-{name}-{i}")
 
     def game_fn(S_mask):
-        o = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
-                            model_tag=f"shaplEIG-{name}-{i}")
-        return o.evaluate(x0, S_mask)
+        return shapl_oracle.evaluate(x0, S_mask)
 
     phi, unique, wall = run_official_shaplEIG(game_fn, X.shape[1], budget,
                                               seed=seed + i)

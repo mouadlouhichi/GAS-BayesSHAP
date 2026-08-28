@@ -9,23 +9,27 @@ width.  This module provides **opt-in** tighter range modes:
     ``R_eff = 4(U - L)`` — the rigorous, unchanged anytime guarantee at the
     nominal level ``1 - delta``.
 
-``finite_population``  (**rigorous**, Theorem E / E' in the paper)
+``finite_population``  (empirical-range tightening with coupon diagnostic,
+    Theorem E / E' in the paper — **nominal anytime validity only after
+    deterministic per-cell thresholds**)
     ``R_eff = 2 * max|observed residual|`` per stratum, i.e. the observed
-    support of the residual marginal.  This is *not* an approximation: the
-    residual marginal for cell ``(i, s)`` is an iid uniform draw from the
-    **finite population** of ``C(M-1, s)`` pairs ``{T, T u {i}}`` with
-    ``|T| = s``, so the probability that the support-maximising pair remains
-    unobserved after ``n_{i,s}`` draws is *at most* ``(1 - 1/N_{i,s})**n``
-    (coupon-collector bound; equality only for a unique maximiser).  The
-    certificate therefore holds at the *realised* level ``1 - delta2 -
-    delta1`` with ``delta1 = sum_{i,s} (1 - 1/C(M-1,s))**n_{i,s}``, which
-    reaches the nominal level ``1 - delta`` once the coupon collector has
-    seen the extreme coalitions (``n_{i,s} >= log(M(delta-delta2)) /
-    log(1/(1-1/N))``).  Reported via ``finite_population_delta1`` /
-    ``finite_population_coverage_level`` / ``certificate_at_nominal_level``;
-    ``range_bound_is_heuristic`` is ``False`` for this mode (the residual
-    bound is valid at the realised level; the *nominal* level is reached
-    only when the deterministic coupon thresholds hold).
+    support of the residual marginal.  The residual marginal for cell
+    ``(i, s)`` is an iid uniform draw from the **finite population** of
+    ``C(M-1, s)`` pairs ``{T, T u {i}}`` with ``|T| = s``, so the probability
+    that the support-maximising pair remains unobserved after ``n_{i,s}``
+    draws is *at most* ``(1 - 1/N_{i,s})**n`` (coupon-collector bound;
+    equality only for a unique maximiser).  At fixed ``n_{i,s}`` the
+    certificate holds at the *realised* level ``1 - delta2 - delta1`` with
+    ``delta1 = sum_{i,s} (1 - 1/C(M-1,s))**n_{i,s}``.  At a data-dependent
+    stopping time ``tau``, ``delta1(tau)`` is random and the realised level
+    is **diagnostic, conditional-on-history, not anytime**.  Nominal
+    ``1 - delta`` anytime validity is claimed only after deterministic
+    per-cell thresholds ``n_{i,s} >= n^*_{i,s}`` are met (Corollary E,
+    ``certificate_at_nominal_level`` flag).  Reported via
+    ``finite_population_delta1`` / ``finite_population_coverage_level`` /
+    ``certificate_at_nominal_level``; ``range_bound_is_heuristic`` is
+    ``False`` for this mode, but ``certificate_is_rigorous`` additionally
+    requires the deterministic thresholds.
 
 ``empirical_max``  (**heuristic**)
     ``R_eff = factor * max_i |observed residual|`` with a small-sample safety
@@ -112,6 +116,41 @@ def coupon_threshold(M: int, s: int, budget_delta1: float) -> int:
     return int(math.ceil(math.log(budget_delta1) / math.log(1.0 - 1.0 / N_s)))
 
 
+def deterministic_coupon_thresholds_satisfied(store, M: int, delta_coupon: float = 0.025) -> bool:
+    """Check deterministic per-cell coupon thresholds (reviewer-proof nominal gating).
+
+    Choose fixed error allocations alpha_{i,s} = delta_coupon / (M*(M-2))
+    before sampling, where M*(M-2) = number of interior cells (s=1..M-2 per
+    feature).  Compute n^*_{i,s} = ceil(log alpha / log(1-1/N_s)).
+    Nominal certification is claimed only if n_{i,s} >= n^*_{i,s} for all
+    interior cells.  This is valid under adaptive allocation because the
+    thresholds are deterministic (fixed before sampling).
+
+    Parameters
+    ----------
+    store: StratumStore with .count(i,s)
+    M: number of features
+    delta_coupon: total coupon budget (typically delta/2)
+    """
+    if M <= 2:
+        return True
+    n_cells = M * (M - 2)
+    if n_cells <= 0:
+        return True
+    alpha = delta_coupon / n_cells
+    if alpha <= 0 or alpha >= 1:
+        return False
+    for s in range(1, M - 1):
+        N_s = population_size(M, s)
+        if N_s <= 1:
+            continue
+        n_star = coupon_threshold(M, s, alpha)
+        for i in range(M):
+            if store.count(i, s) < n_star:
+                return False
+    return True
+
+
 def empirical_max_range(
     residuals: np.ndarray,
     safety_factor: float = 2.0,
@@ -174,10 +213,12 @@ def per_stratum_ranges(
 
     ``mode="spec"`` -> every stratum uses ``spec_range`` (rigorous).
     ``mode="finite_population"`` -> stratum range ``2 * max|observed
-    residual|`` (rigorous *at the realised level* ``1 - delta2 - delta1``,
-    see :func:`finite_population_coupon_delta1`; with the default
+    residual|`` (valid at fixed n at realised level ``1 - delta2 - delta1``,
+    see :func:`finite_population_coupon_delta1`; diagnostic at stopping
+    time tau, nominal only after deterministic thresholds
+    :func:`deterministic_coupon_thresholds_satisfied`; with the default
     ``safety_factor=2.0`` the range is exactly twice the observed max, the
-    rigorous support bound once the support max is observed).
+    support bound once the support max is observed).
     ``mode="empirical_max"`` -> ``safety_factor * max|observed residual|``
     (heuristic, flagged).
     ``mode="holdout"`` -> falls back to empirical_max per stratum (the true

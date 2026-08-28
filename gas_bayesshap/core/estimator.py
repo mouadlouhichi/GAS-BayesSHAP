@@ -928,31 +928,38 @@ class GASBayesSHAP:
 
         # ---- finite-population empirical-range accounting (Theorem E) ---- #
         # For range_mode="finite_population" the certified width uses the
-        # observed support of each stratum's residual marginal; the
-        # probability that the true support max remains unobserved is charged
-        # to the coupon-collector budget delta1 = sum_{i,s} (1-1/N_s)^n_{i,s},
-        # so the realised simultaneous coverage level is 1 - delta_cs - delta1
-        # with delta_cs <= delta/2 (the Theorem-B anytime split) and
-        # delta1 <= delta/2 for the nominal level 1 - delta.
+        # observed support of each stratum's residual marginal.
+        # At fixed n_{i,s}, the coupon diagnostic delta1 = sum (1-1/N_s)^n
+        # gives realised level 1 - delta2 - delta1 (lower bound).  At a
+        # data-dependent stopping time tau, delta1(tau) is random and the
+        # realised level is diagnostic, conditional-on-history, not anytime.
+        # Nominal 1-delta anytime validity requires deterministic per-cell
+        # thresholds n_{i,s} >= n^*_{i,s} = ceil(log alpha_{i,s} / log(1-1/N_s))
+        # with sum alpha_{i,s} <= delta/2 (Corollary E).  We enforce the
+        # deterministic thresholds for nominal gating (reviewer-proof).
         fp_delta1 = None
         fp_level = None
         fp_at_level = None
+        fp_thresholds_ok = None
         if getattr(self, "_range_mode", "spec") == "finite_population":
             from ..certification.empirical_range import (
                 finite_population_coupon_delta1,
                 finite_population_coverage_level,
+                deterministic_coupon_thresholds_satisfied,
             )
             fp_delta1 = finite_population_coupon_delta1(store, M)
             fp_level = finite_population_coverage_level(fp_delta1, delta2=0.5 * delta)
-            # nominal level 1 - delta requires the deterministic coupon
-            # thresholds (Corollary E): sum of per-cell (1-1/N_s)^n <= delta/2
-            # while the anytime CS consumes the other delta/2.
-            fp_at_level = bool(fp_delta1 <= 0.5 * delta)
+            # Diagnostic aggregate (random at stopping time, not used for nominal gating)
+            fp_at_level_aggregate = bool(fp_delta1 <= 0.5 * delta)
+            # Deterministic per-cell thresholds — the valid nominal gate
+            fp_thresholds_ok = deterministic_coupon_thresholds_satisfied(
+                store, M, delta_coupon=0.5 * delta
+            )
+            fp_at_level = bool(fp_thresholds_ok)
 
-        # For the finite-population mode the range is rigorous at the
-        # realised level 1 - delta2 - delta1, but `certificate_is_rigorous`
-        # (nominal 1-delta) additionally requires the coupon collector to
-        # have completed: fp_delta1 <= delta/2 (Corollary E).
+        # For the finite-population mode the range is valid at the realised
+        # (diagnostic) level, but `certificate_is_rigorous` (nominal 1-delta)
+        # requires the deterministic coupon thresholds to have completed.
         rigorous = (not heuristic_bounds) and all_finite
         if getattr(self, "_range_mode", "spec") == "finite_population":
             rigorous = rigorous and bool(fp_at_level)
@@ -963,6 +970,14 @@ class GASBayesSHAP:
             budget_exhausted=budget_exhausted,
             missing_strata=missing_strata,
         )
+
+        # Sign certification split (audit P0): zero-excluding vs nominal
+        zero_excluding = np.where(sign_cert)[0].tolist()
+        # nominal sign certification requires rigor + nominal level (for finite_pop, deterministic thresholds)
+        if getattr(self, "_range_mode", "spec") == "finite_population":
+            nominal_sign_cert = zero_excluding if (rigorous and bool(fp_at_level)) else []
+        else:
+            nominal_sign_cert = zero_excluding if rigorous else []
 
         git = git_commit_and_dirty()
         results = RunResults(
@@ -981,7 +996,7 @@ class GASBayesSHAP:
             certificate_is_rigorous=bool(rigorous),
             range_bound_is_heuristic=bool(heuristic_bounds),
             uncertified_features=np.where(~np.isfinite(widths))[0].tolist(),
-            sign_certified_features=np.where(sign_cert)[0].tolist(),
+            sign_certified_features=nominal_sign_cert,  # now nominally rigorous only
             run_id=self.run_id,
             M=int(M),
             domain_game=self.domain_game,
@@ -1029,8 +1044,11 @@ class GASBayesSHAP:
                 "finite_population_coverage_level": (None if fp_level is None
                                                      else float(fp_level)),
                 "finite_population_at_level_delta": bool(fp_at_level),
+                "finite_population_thresholds_satisfied": bool(fp_thresholds_ok) if fp_thresholds_ok is not None else None,
                 "certificate_at_nominal_level": bool(fp_at_level) if getattr(
                     self, "_range_mode", "spec") == "finite_population" else None,
+                "zero_excluding_features": zero_excluding,
+                "nominal_sign_certified_features": nominal_sign_cert,
                 "cache_hit_rate": self._cache.hit_rate() if self._cache is not None else 0.0,
             },
         )
@@ -1161,6 +1179,22 @@ class GASBayesSHAP:
     def _checkpoint_certification(self, store, sigma_res, neyman, widths, converged: bool, checkpoint: bool) -> None:
         if not checkpoint or self._checkpoint_manager is None:
             return
+        # Compute finite-population diagnostics for persistence (audit P0)
+        fp_delta1 = None
+        fp_at_level = None
+        fp_thresholds_ok = None
+        range_mode = str(self.config.get("range_mode", "spec"))
+        if range_mode == "finite_population":
+            from ..certification.empirical_range import (
+                finite_population_coupon_delta1,
+                deterministic_coupon_thresholds_satisfied,
+            )
+            fp_delta1 = finite_population_coupon_delta1(store, self.M)
+            fp_thresholds_ok = deterministic_coupon_thresholds_satisfied(
+                store, self.M, delta_coupon=0.5 * float(self.config.get("delta", 0.05))
+            )
+            fp_at_level = bool(fp_thresholds_ok)
+
         payload = self._checkpoint_payload_base()
         payload.update(self._gp_state_payload())
         payload.update(
@@ -1173,6 +1207,9 @@ class GASBayesSHAP:
                 "sigma_res": sigma_res,
                 "neyman_probs": neyman.probabilities,
                 "widths": widths,
+                "finite_population_delta1": None if fp_delta1 is None else float(fp_delta1),
+                "coupon_threshold_satisfied": bool(fp_thresholds_ok) if fp_thresholds_ok is not None else None,
+                "certificate_at_nominal_level": bool(fp_at_level) if fp_at_level is not None else None,
             }
         )
         self._checkpoint_manager.save("certification_stage", int(self.state.iteration), payload)
@@ -1258,7 +1295,26 @@ class GASBayesSHAP:
             phi_final = project_efficiency(phi_raw, delta_total, posterior_variances)
             certified = corollary_widths(widths, posterior_variances)
             sign_cert = sign_certified(phi_final, certified)
+            # Rigor gating must recompute finite-population coupon condition,
+            # not just check output_bounds + finite widths (audit P0 resume bug)
             rigorous = self.config.get("output_bounds") is not None and bool(np.all(np.isfinite(widths)))
+            range_mode = str(self.config.get("range_mode", "spec"))
+            if range_mode == "finite_population":
+                from ..certification.empirical_range import (
+                    deterministic_coupon_thresholds_satisfied,
+                )
+                delta_cfg = float(self.config.get("delta", 0.05))
+                fp_ok = deterministic_coupon_thresholds_satisfied(
+                    store, self.M, delta_coupon=0.5 * delta_cfg
+                )
+                rigorous = rigorous and bool(fp_ok)
+            # Sign certification split for resume path too
+            zero_excluding_resume = np.where(sign_cert)[0].tolist()
+            if range_mode == "finite_population":
+                nominal_sign_cert_resume = zero_excluding_resume if rigorous else []
+            else:
+                nominal_sign_cert_resume = zero_excluding_resume if rigorous else []
+
             git = git_commit_and_dirty()
             results = RunResults(
                 shapley_values=phi_final, surrogate_shapley=phi_m_D, residual_shapley=phi_r,
@@ -1273,12 +1329,16 @@ class GASBayesSHAP:
                 certificate_is_rigorous=bool(rigorous),
                 range_bound_is_heuristic=self.config.get("output_bounds") is None,
                 uncertified_features=np.where(~np.isfinite(widths))[0].tolist(),
-                sign_certified_features=np.where(sign_cert)[0].tolist(),
+                sign_certified_features=nominal_sign_cert_resume,
                 run_id=self.run_id, M=self.M, domain_game=self.domain_game,
                 config_hash=self.config_hash, oracle_hash=self.oracle.oracle_h,
                 background_hash=self.oracle.background_h, git_commit=git.get("commit", ""),
                 status=ResultStatus.CERTIFIED if (converged and rigorous) else ResultStatus.NOT_CERTIFIED,
                 converged_early=converged,
+                extra={
+                    "zero_excluding_features": zero_excluding_resume,
+                    "nominal_sign_certified_features": nominal_sign_cert_resume,
+                },
             )
             self._results = results
             return {"done": True, "result": results.to_dict()}

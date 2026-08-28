@@ -49,9 +49,7 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
 | Finite-population (Thm E) | 1.0 | 1.0 | **2.38** | 98.6 |
 
 - The finite-population mode reports the realised coverage level
-  `1 − δ2 − δ1` (mean 0.959, mean δ1 = 0.016 on M=3) — the certificate is
-  rigorous at that level, and reaches the nominal 1−δ once the coupon
-  thresholds hold (Corollary E).
+  `1 − δ2 − δ1` (mean 0.959, mean δ1 = 0.016 on M=3) — at fixed n rigorous at that realised level, but at a data-dependent stopping time τ, δ1(τ) is random and the realised level is diagnostic, conditional-on-history, not anytime. Nominal 1−δ is claimed only after deterministic coupon thresholds hold (Corollary E, certificate_at_nominal_level flag).
 - Real-data check: simultaneous coverage 1.0 on all N=50 instances of RQ1.
 - Tight-ε calibration (ε ∈ {0.05, 0.1, 0.2, 0.5}, R=200, both modes):
   coverage 1.0 and finite-width rate 1.0 at every ε
@@ -90,23 +88,25 @@ All numbers below are read from the committed `main_results/paper_*.csv` /
 
 ## RQ3 — Regime semantics (air quality, Aotizhongxin station)
 
-`paper_regime_semantics_summary.csv`
+`paper_regime_semantics_summary.csv` (N=20 per regime, 80 total — audit P1-3 closed)
 
 | Regime | N instances | RMSE | Spearman |
 |---|---:|---:|---:|
-| winter_smog | 5 | 0.00101 | 0.559 |
-| photochemical | 5 | 0.00206 | 0.418 |
-| clean_air | 5 | 0.00251 | 0.228 |
-| clean_air_2 | 5 | 0.00261 | −0.116 |
+| winter_smog | 20 | 0.00178 | 0.567 |
+| photochemical | 20 | 0.00247 | 0.411 |
+| clean_air | 20 | 0.00348 | 0.106 |
+| clean_air_2 | 20 | 0.00360 | −0.172 |
 
 - Regimes are named by driver profile (winter_smog: PM10/CO/PM2.5;
-  photochemical: O3/NO2/WSPM).  N=20 instances total.  The two clusters
-  that both mapped to `clean_air` are now distinguished (duplicate names
-  suffixed): clean_air has weak positive driver correlation, clean_air_2
-  negative — evidence of two distinct low-pollution subregimes rather than
-  one collapsed label.  **Honest caveat:** the clean-air subregimes have
-  near-zero attributions, so their rank correlations are noise-dominated;
-  the strongest semantic signal is winter_smog and photochemical.
+  photochemical: O3/NO2/WSPM).  N=80 instances total (20 per named regime).
+  The two clusters that both mapped to `clean_air` are now distinguished
+  (duplicate names suffixed): clean_air has weak positive driver
+  correlation, clean_air_2 negative — evidence of two distinct low-pollution
+  subregimes rather than one collapsed label.  **Honest caveat:** the
+  clean-air subregimes have near-zero attributions, so their rank
+  correlations are noise-dominated; the strongest semantic signal is
+  winter_smog and photochemical.  Spearman computed as correlation between
+  GAS |attribution| ranking and expected driver ranking per regime.
 
 ## RQ4 — Ablation (wine, N=20)
 
@@ -237,12 +237,9 @@ artifact of the degenerate design and are **invalid**.
 > Corollary C.1 PROJECTED widths.  Runs record
 > `converged_on_raw_widths` and `converged_on_projected_widths`
 > separately; `converged=True` does NOT imply max W_proj ≤ ε.
-
-> **Convergence semantics (audit):** `converged` is decided on the RAW
-> residual widths (max W_res ≤ ε); the returned intervals are the larger
-> Corollary C.1 PROJECTED widths.  Runs therefore record
-> `converged_on_raw_widths` and `converged_on_projected_widths` separately,
-> and `converged=True` does NOT imply max W_proj ≤ ε.
+> Sign certification is split into `zero_excluding_features` (empirical
+> |φ*|>W) and `nominal_sign_certified_features` (requires
+> `certificate_is_rigorous=True` and deterministic coupon thresholds).
 
 `paper_nominal_certification_wine.csv`, `paper_nominal_certification_air.csv`
 (N=3 instances each, ε=0.02, budget=200000, finite-population range;
@@ -280,7 +277,7 @@ exact ground truth per instance; **the audit's blockers 1+2 closure**)
   demonstrated: a run can converge on width without the coupon closing
   (air 0) or close the coupon without the width target (wine 1/2, air 2).
 
-## High-dimensional sub-enumerative certification (M=30)
+## High-dimensional sub-enumerative empirical sign separation (M=30) — coupon open, non-nominal (empirical-event, NOT nominal certification)
 
 `paper_high_dim_M30_summary.csv` (sparse synthetic game, closed-form exact
 Shapley; 6 driver features |φ|≈0.033–0.037; 2^30 ≈ 1.07e9 infeasible;
@@ -345,6 +342,33 @@ all.
   run of the project to reach the nominal 1−δ level at feasible budget on
   an M=11 real game.
 
+## Unique-query-capped GAS vs ShaplEIG (audit P1-2, fixed)
+
+`paper_unique_capped_shaplEIG.csv` (N=10 per dataset, caps 512,1024 — both <<2048, cache_enabled=True so gas_unique = cache misses = distinct masks, persistent ShaplEIG oracle for fair timing)
+
+| Dataset | Cap | GAS RMSE | ShaplEIG RMSE | GAS unique | ShaplEIG unique | cap_honored | unique_matched |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Wine | 512 | 0.0035 | 0.00035 | 503 | 512 | True | True |
+| Wine | 1024 | 0.0022 | 0.00015 | 1019 | 1024 | True | True |
+| Air | 512 | 0.0038 | 0.0015 | 503 | 512 | True | True |
+| Air | 1024 | 0.0025 | 0.0009 | 1019 | 1024 | True | True |
+
+- **Protocol fixed after deep audit:** GAS now uses `cache_enabled=True` and counts distinct masks via cache misses + explicit packbits tracking (not evaluation calls), fixed cost 371 measured via `max_budget=0`, ShaplEIG uses persistent `CoalitionOracle` for fair wall-clock.
+- **Honest result:** At matched unique budgets 512/1024, ShaplEIG port achieves lower point RMSE (e.g. wine 512: GAS 0.0035 @503 vs ShaplEIG 0.00035 @512). GAS differentiators remain distribution-free anytime certificates + Neyman residual control, not unconditional RMSE dominance. Wall-clock: ShaplEIG still heavier (GP refit per round) — now fairly measured via persistent oracle.
+
+## Hard high-dim games beyond parity (audit P1-4)
+
+`paper_high_dim_M30_threshold_spec_summary.csv`, `paper_high_dim_M30_unanimity_spec_summary.csv` (M=30, spec range, closed-form exact Shapley validated vs brute at M<=12)
+
+| Game | K | RMSE | Mean width | Rigorous | Sign-cert |
+|---|---:|---:|---:|---:|---:|
+| threshold 2-of-4 (φ=0.0625 on 4 drivers) | 50k | 0.00188 | 10.50 | True | 0 |
+| threshold | 100k | 0.00132 | 5.46 | True | 0 |
+| unanimity 4-way AND (φ=0.125 on 4 drivers) | 50k | 0.00132 | 28.07 | True | 0 |
+| unanimity | 100k | 0.00069 | 26.23 | True | 0 |
+
+- **Misspecification robustness:** Even on sharp high-order games where GP surrogate is unfavourable, residual correction retains good fidelity (RMSE ~1e-3) and spec-range intervals retain empirical coverage 1.0 and rigor True, certifying nothing falsely (0 sign-cert). This strengthens the misspecification story beyond parity.
+
 ## What can / cannot be claimed
 
 **Can claim:**
@@ -352,25 +376,27 @@ all.
   ~1.7–1.9e-3 at ~1.4k evals, N=50) with simultaneous coverage 1.0.
 - Certificates tighten as 1/√K with a characterised constant; the
   finite-population refinement shrinks widths 5–9× (and ~34× at M=30) at a
-  rigorous *realised* coverage level.
+  diagnostic realised level (conditional-on-history at stopping time, nominal only after deterministic per-cell thresholds — Theorem E with deterministic gating).
 - **Rigorous nominal 1−δ certificates on M≤11 real games** (5/6 instances,
   13 sign-certified features, all signs validated vs exact) — explicitly
-  **post-enumerative** (2048 unique = 2^11).
+  **post-enumerative** (2048 unique = 2^11) and gated by deterministic coupon thresholds `n_{i,s} >= n^*_{i,s}` (audit fix).
 - **Sub-enumerative empirical sign separation at M=30** (3 driver
   features, unique coalition evals 2.3e5 ≪ 2^30, signs validated vs the
   analytic exact, RMSE ~1e-5) — an *empirical-event interval* under the
   finite-population range, honestly non-nominal (coupon wall); NOT called
-  sign certification in the nominal sense.
+  sign certification in the nominal sense; reported as `zero_excluding_features` vs `nominal_sign_certified_features`.
+- **Unique-query-capped GAS vs ShaplEIG at 512/1024 (N=10):** truly unique-counted (cache misses + packbits), cap_honored True, unique_matched True, persistent oracle timing — ShaplEIG generally lower RMSE, GAS adds formal certificates.
+- **Regime semantics N=20 per regime (80 total):** winter_smog RMSE 0.00178 Spearman 0.567, photochemical 0.00247/0.411 — stronger evidence than N=5.
+- **Hard high-dim games:** threshold/unanimity at M=30 show spec-range intervals remain rigorous and coverage 1.0 under misspecification.
 - Dominance over Monte Carlo at matched budgets; competitiveness with
   KernelSHAP at low budgets; the unique distribution-free anytime
   certificate.
 
 **Cannot yet claim:**
-- Unconditional RMSE superiority over KernelSHAP (curves contradict it).
+- Unconditional RMSE superiority over KernelSHAP or ShaplEIG (curves and unique-capped results contradict it).
 - **Nominal** 1−δ certification at M=30 (coupon-collector wall: C(29,s) up
   to 7.7e7 per cell cannot be exhausted at feasible K); nominal anytime
   certification is near-enumerative (M ≲ 14).
 - Sign-certified feature discovery at the **standard budget (K=3000)** for
   M=11 (fp width ~1.9 > dominant attribution ~0.26).
-- Statistical regime semantics per regime at N≥20 (currently 5–10/regime).
-- Official OddSHAP/ShaplEIG parity (method-style baselines only).
+- Official OddSHAP/ShaplEIG parity beyond the port (method-style baselines only).

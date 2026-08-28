@@ -20,8 +20,11 @@ the paper settings) and are NOT the paper drivers.
 | `paper_ablation_wine{,_summary}.csv` | `scripts/ablation.py` | 4-tier ablation (N=20, K=1000) |
 | `paper_regime_semantics{,_summary}.csv` | `scripts/regime_semantics.py` | Per-regime driver correlations (N=20, suffixed names) |
 | `paper_reference_baselines_ablation.csv` | `scripts/run_sota_baselines.py` | OddSHAP-style (log-odds transform) + GP-quadrature internal references — NOT official SOTA |
-| `paper_shaplEIG_port_{wine,air}.csv` | `scripts/run_official_shaplEIG.py` | **Official ShaplEIG** (ported from slds-lmu/shapleig@d52c09e, MIT) at matched unique-query budgets, RMSE vs exact |
-| `paper_high_dim_M30_summary.csv` | `scripts/probe_high_dim.py` | Sub-enumerative probe at M=30 (unique ≪ 2^30), sign-cert + honest non-nominal |
+| `paper_shaplEIG_port_{wine,air}.csv` | `scripts/run_official_shaplEIG.py` | **Faithful ShaplEIG port** (ported from slds-lmu/shapleig@d52c09e, MIT, pure NumPy/SciPy) at budgets 64/128/256 — reference with actual unique-query diagnostics; not a matched-query comparison |
+| `paper_unique_capped_shaplEIG.csv` | `scripts/run_unique_capped_shaplEIG.py` | **Unique-query-capped** GAS vs ShaplEIG at 512/1024 (N=10, cache misses = distinct masks via packbits, persistent oracle, cap_honored=True, unique_matched=True) — ShaplEIG generally lower RMSE, GAS adds formal certificates |
+| `paper_high_dim_M30_summary.csv` | `scripts/probe_high_dim.py` | Sub-enumerative probe at M=30 (sparse_pairwise, parity, threshold, unanimity) — unique ≪ 2^30, RMSE vs exact, honest non-nominal |
+| `paper_high_dim_M30_threshold_spec_summary.csv` | `probe_high_dim.py --game threshold` | M=30 threshold 2-of-4 hard game, spec range, RMSE vs exact, rigorous True |
+| `paper_high_dim_M30_unanimity_spec_summary.csv` | `probe_high_dim.py --game unanimity` | M=30 unanimity 4-way AND hard game, spec range, RMSE vs exact, rigorous True |
 | `paper_nominal_certification_{wine,air}.csv` | `scripts/probe_nominal_certification.py` | Multi-instance nominal 1−δ at K=2e5 (M=11, POST-enumerative; reports unique/attempted/fraction) |
 | `paper_width_probe{,_finite_population}.csv` | `scripts/probe_width_tightness.py` | Width law W≈318/√K (spec) and ~6.5× tighter (fp), K=2k..200k |
 | `paper_coverage_calibration_R500{,_finite_population}.json` | `scripts/coverage_validation.py` | R=500 coverage, spec + fp (realised level 1−δ2−δ1) |

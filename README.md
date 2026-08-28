@@ -184,13 +184,24 @@ numerics, certification and engineering requirements of the specification
 The repository implements the **complete algorithm engine** (bounded-linear
 control variate, Lemmas D–G, Theorems A–C, Corollary C.1, certification,
 checkpointing, logging, caching) plus the **domain-game wrappers**
-(membership, contrastive, archetype, silhouette, group-lag).  However, the
-**CLI scripts currently run synthetic stand-in models** (logistic/linear toy
-games) — the real Wine-quality / Beijing air-quality clustering pipelines
-(PCA → K-Means → LightGBM surrogate, DEC + temporal transformer) and their
-data loaders are **not bundled**.  The CLI prints a notice whenever
-`--dataset wine|beijing_*` is used; script results are for engine validation,
-not for the paper's experimental claims.
+(membership, contrastive, archetype, silhouette, group-lag) **and the real
+domain pipelines**:
+
+- **Paper experiment scripts** (`scripts/run_paper_experiments.py`,
+  `regime_semantics.py`, `run_unique_capped_shaplEIG.py`,
+  `probe_high_dim.py`, etc.) contain the real Wine-quality / Beijing
+  air-quality clustering pipelines (StandardScaler → KMeans → LightGBM
+  surrogate) with data loaders for `data/winequality-white.csv` and
+  `data/Beijing_MultiSite_AirQuality.csv`. These are the paper drivers and
+  produce the committed `main_results/paper_*.csv` artifacts.
+- **Generic CLI** (`scripts/run_bayesshap.py`) uses synthetic stand-in models
+  (logistic/linear toy games) for engine validation and demo — it prints a
+  notice when `--dataset wine|beijing_*` is used in that generic path.
+
+The demo notebooks (`SHAP_WINE_GAS.ipynb`, `AIR_QUALITY_GAS.ipynb`) are
+smoke-test demos (ε=15, budget=1500) with a `PAPER_GRADE` switch for paper
+settings; the paper-grade runs are via `scripts/run_paper_experiments.py`
+and `RUN_AUDIT_CLOSURE.ipynb`.
 
 ## Caveats / engineering decisions (documented)
 

@@ -20,7 +20,7 @@ init), so the methods were NOT unique-matched.  This script closes that:
     genuinely unique-query-matched when both ~= U.
 
 Usage:
-    python scripts/run_unique_capped_shaplEIG.py --n 10 --caps 64,128,256
+    python scripts/run_unique_capped_shaplEIG.py --n 10 --caps 512,1024
 Outputs -> results/paper_experiments/unique_capped_shaplEIG.csv
            + main_results/paper_unique_capped_shaplEIG.csv
 """
@@ -53,31 +53,47 @@ from run_official_shaplEIG import run_official_shaplEIG, SHAPLEIG_SOURCE
 OUT = ROOT / "results" / "paper_experiments"
 MAIN = ROOT / "main_results"
 
-GAS_CONFIG = {"checkpoint_enabled": False, "cache_enabled": False,
+GAS_CONFIG = {"checkpoint_enabled": False, "cache_enabled": True,
               "persist_cache": False, "log_level": "NONE",
               "range_mode": "spec"}
 
 
-def run_gas_capped(fn, bg, x0, M, cap, seed):
-    """GAS with a hard cap on UNIQUE coalition evals (cache disabled).
-
-    Stage-1 evals are measured first on a throwaway engine (deterministic
-    design), then Stage-2 is budgeted to cap - stage1 so the TOTAL unique
-    evals of the actual run stay within the cap (Stage-1 overhead inside
-    the cap, as the audit requires).
-    """
+def _measure_fixed_cost(fn, bg, x0, seed):
+    """Fixed cost: Stage-1 + pilot + init (max_budget=0), unique via cache."""
     eng0 = GASBayesSHAP(fn, bg, output_bounds=(0.0, 1.0),
                         rng=np.random.RandomState(seed), config=dict(GAS_CONFIG))
-    s1 = eng0.explain_stage1_only(x0, n_active_steps=10)
-    stage1_evals = int(s1["num_coalition_evals"])
-    budget2 = max(0, cap - stage1_evals)
+    r0 = eng0.explain(x0, epsilon=0.05, delta=0.05, max_budget=0,
+                      n_pilot=3, n_active_steps=10)
+    return int(r0["num_coalition_evals_this_call"])
+
+
+def run_gas_capped(fn, bg, x0, M, cap, seed, fixed_cost=None):
+    """GAS with a hard cap on UNIQUE coalition evals (cache enabled).
+
+    We count genuinely distinct masks, not evaluation calls:
+    - cache_enabled=True so num_coalition_evals_this_call = cache misses = unique
+    - we also track seen masks explicitly via packbits for auditability
+    - fixed cost (Stage-1 active GP + pilot init) is measured first on a
+      throwaway engine with max_budget=0 (deterministic), then Stage-2 is
+      budgeted as cap - fixed_cost so TOTAL unique evals ~= cap (Stage-1
+      overhead inside the cap, as audit requires).
+
+    If fixed_cost is provided, it is not re-measured (for fair timing).
+    Returns (phi, unique_coalitions, attempted_draws, model_evals)
+    """
+    # measure fixed cost: Stage-1 + pilot + init (max_budget=0) if not provided
+    if fixed_cost is None:
+        fixed_cost = _measure_fixed_cost(fn, bg, x0, seed)
+    budget2 = max(0, cap - fixed_cost)
 
     eng = GASBayesSHAP(fn, bg, output_bounds=(0.0, 1.0),
                        rng=np.random.RandomState(seed), config=dict(GAS_CONFIG))
     r = eng.explain(x0, epsilon=0.05, delta=0.05, max_budget=budget2,
                     n_pilot=3, n_active_steps=10)
-    unique = int(r["num_coalition_evals_this_call"])  # cache off -> all unique
-    return np.asarray(r["shapley_values"]), unique, int(r.get("stage2_attempted_total", 0))
+    unique = int(r["num_coalition_evals_this_call"])  # cache on -> cache misses = unique
+    attempted = int(r.get("stage2_attempted_total", 0)) + fixed_cost
+    model_evals = int(r.get("num_model_evals_this_call", 0))
+    return np.asarray(r["shapley_values"]), unique, attempted, model_evals
 
 
 def run_one(ds, X, feats, nc, i, cap, seed):
@@ -87,35 +103,47 @@ def run_one(ds, X, feats, nc, i, cap, seed):
     x0 = X_te.iloc[i].values
     bg = X.sample(64, random_state=seed + i).values
 
-    oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
-                             model_tag=f"uc-{ds}-{i}-exact")
+    oracle_exact = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
+                                   model_tag=f"uc-{ds}-{i}-exact")
     phi_exact = exact_shapley_from_values(
-        exact_game_values(oracle, x0, X.shape[1]), X.shape[1])
+        exact_game_values(oracle_exact, x0, X.shape[1]), X.shape[1])
+
+    # Precompute fixed cost outside timers (fair timing, audit 7.3)
+    fixed_cost = _measure_fixed_cost(fn, bg, x0, seed + i)
+
+    # Persistent oracle for ShaplEIG — fair timing, no per-query rebuild (audit 6.3)
+    shapl_oracle = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
+                                   model_tag=f"uc-{ds}-{i}")
 
     def game_fn(S_mask):
-        o = CoalitionOracle(fn, bg, output_bounds=(0.0, 1.0),
-                            model_tag=f"uc-{ds}-{i}")
-        return o.evaluate(x0, S_mask)
+        return shapl_oracle.evaluate(x0, S_mask)
 
     t0 = time.time()
-    phi_g, ug, att = run_gas_capped(fn, bg, x0, X.shape[1], cap, seed + i)
+    phi_g, ug, att, mg = run_gas_capped(fn, bg, x0, X.shape[1], cap, seed + i, fixed_cost=fixed_cost)
     t_gas = time.time() - t0
 
     t0 = time.time()
     phi_s, us, t_s = run_official_shaplEIG(game_fn, X.shape[1], cap, seed=seed + i)
     t_s = time.time() - t0
+    shapl_model_evals = int(shapl_oracle.total_model_evals)
 
     return {
         "dataset": ds, "instance": i, "unique_cap": cap,
         "gas_rmse": rmse(phi_g, phi_exact),
         "shaplEIG_rmse": rmse(phi_s, phi_exact),
         "gas_unique_evals": ug,
+        "gas_unique_coalitions": ug,
+        "gas_coalition_eval_calls": att,
+        "gas_model_evals": mg,
         "shaplEIG_unique_queries": us,
+        "shaplEIG_unique_coalitions": us,
+        "shaplEIG_model_evals": shapl_model_evals,
         "gas_attempted_draws": att,
         "gas_wall_s": round(t_gas, 1),
         "shaplEIG_wall_s": round(t_s, 1),
         "cap_honored": bool(ug <= cap * 1.05 + 2),
         "unique_matched": bool(abs(ug - us) <= 0.35 * max(ug, us)),
+        "fixed_cost": fixed_cost,
     }
 
 

@@ -1,0 +1,9 @@
+=== GAS-BayesSHAP mathematical validation ===
+  ✓ Lemma D M=1 sanity: max|diff| = 0.000e+00
+  ✓ Lemma D M=4: max|diff| = 5.551e-17
+  ✓ Lemma E M=2: max|diff| = 1.388e-17
+  ✓ Lemma E M=3: max|diff| = 1.561e-17
+  ✓ Lemma E M=4: max|diff| = 1.110e-16
+  ✓ Lemma E M=5: max|diff| = 6.106e-16
+  ✓ Lemma E M=6: max|diff| = 2.776e-16
+ALL MATHEMATICAL VALIDATION CHECKS PASSED.

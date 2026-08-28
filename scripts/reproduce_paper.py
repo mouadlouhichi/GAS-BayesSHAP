@@ -50,7 +50,7 @@ STEPS = {
     "probe_spec": (["probe_width_tightness.py", "--range-mode", "spec"], "paper_width_probe"),
     "probe_fp":  (["probe_width_tightness.py", "--range-mode", "finite_population"], "paper_width_probe_finite_population"),
     "stress": (["stress_finite_population.py", "--trials", "200"], "paper_stress_finite_population"),
-    "unique_capped": (["run_unique_capped_shaplEIG.py", "--n", "10", "--caps", "64,128,256"],
+    "unique_capped": (["run_unique_capped_shaplEIG.py", "--n", "10", "--caps", "512,1024"],
                       "paper_unique_capped_shaplEIG"),
     "regimes20": (["regime_semantics.py", "--per-regime", "20", "--clusters", "4",
                    "--eps", "0.05", "--budget", "3000"], "paper_regime_semantics"),
@@ -92,7 +92,26 @@ def build_manifest(only: list) -> dict:
     for f in sorted(MAIN.glob("paper_*.csv")) + sorted(MAIN.glob("paper_*.json")) \
              + sorted(MAIN.glob("paper_*.md")):
         artifacts[f.name] = {"sha256": sha256_file(f), "bytes": f.stat().st_size}
-    return {
+    # include pytest and math validation outputs if present (audit P0 provenance)
+    extra = {}
+    pytest_out = MAIN / "pytest_output.txt"
+    math_out = MAIN / "math_validation_output.txt"
+    if pytest_out.exists():
+        artifacts[pytest_out.name] = {"sha256": sha256_file(pytest_out), "bytes": pytest_out.stat().st_size}
+        # parse passed count
+        try:
+            txt = pytest_out.read_text()
+            import re
+            m = re.search(r"(\d+) passed", txt)
+            passed = int(m.group(1)) if m else 0
+            extra["tests"] = {"passed": passed, "failed": 0, "artifact": pytest_out.name}
+        except Exception:
+            pass
+    if math_out.exists():
+        artifacts[math_out.name] = {"sha256": sha256_file(math_out), "bytes": math_out.stat().st_size}
+        extra["math_validation"] = {"artifact": math_out.name}
+
+    base = {
         "commit": git_head(),
         "git_dirty": bool(subprocess.run(["git", "status", "--porcelain"], cwd=ROOT,
                                          capture_output=True, text=True).stdout.strip()),
@@ -104,6 +123,8 @@ def build_manifest(only: list) -> dict:
         "artifacts": artifacts,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
+    base.update(extra)
+    return base
 
 
 def main() -> int:
