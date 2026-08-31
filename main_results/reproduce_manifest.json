@@ -1,5 +1,5 @@
 {
- "commit": "875e15c2109227fba94905e987375fe05c1b6ead",
+ "commit": "0df196b36dd1115ee0502d7a87f1466d0af3dd4f",
  "git_dirty": false,
  "python": "3.11.2",
  "steps_requested": [],
@@ -119,8 +119,8 @@
    "bytes": 755
   },
   "paper_unique_capped_shaplEIG.csv": {
-   "sha256": "c4ec11a8d595f60b4bac638fa710eb0115ad64209bb207dc467e3d9b7bcf67fe",
-   "bytes": 11341
+   "sha256": "5d7ba25c053aa1e45f03abd53d5f015b401110d332c1cd5e7c308e0b5654404f",
+   "bytes": 12624
   },
   "paper_width_probe.csv": {
    "sha256": "f5df8c60a2e6648b5a1b8c761a51b288d6f8b2de955aacb49707dd70d4f24df2",
@@ -223,7 +223,7 @@
    "bytes": 383
   }
  },
- "timestamp": "2026-08-28T15:03:15Z",
+ "timestamp": "2026-08-31T22:57:58Z",
  "tests": {
   "passed": 202,
   "failed": 0,
