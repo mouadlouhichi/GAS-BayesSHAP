@@ -1,4 +1,4 @@
-# GAS-BayesSHAP — Paper Results Summary (regenerated 2026-08-16)
+# GAS-BayesSHAP — Paper Results Summary (regenerated 2026-09-01 — deterministic thresholds, resume fix, true unique counting, regime 20/regime, threshold/unanimity)
 
 All numbers below are read from the committed `main_results/paper_*.csv` /
 `*.json` artifacts.  Every experiment is reproducible via
@@ -169,18 +169,20 @@ a 5.7× reduction vs the spec range at identical fidelity.  No macro-player
 is sign-certified at this budget (consistent with the wine/air N=50 fp
 finding).
 
-## Baselines (official ShaplEIG port + reference ablation)
+## Baselines (faithful ShaplEIG port + reference ablation)
 
-**Official ShaplEIG** (`scripts/run_official_shaplEIG.py` + orchestrator
+**Faithful ShaplEIG port** (`scripts/run_official_shaplEIG.py` + orchestrator
 `main_results/RUN_OFFICIAL_SHAPLEIG.ipynb`): the authors' public MIT repo
 (github.com/slds-lmu/shapleig, pinned `d52c09e`) was ported faithfully —
 Hamming-kernel exact GP with MLL fit, the EIG acquisition
 `_compute_eig_function_property_naive_Z`, and the Shapley coefficient
 matrix `_get_shapley_weights` — in **pure NumPy/SciPy** (the torch stack
 crashed natively on macOS, so the port carries the identical math with no
-torch import; diffable against the pinned source).  Run on the same
-wine/air membership games at matched **unique** query budgets, RMSE vs
-exact (`paper_shaplEIG_port_{wine,air}.csv`, N=1, budgets 64/128/256):
+torch import; diffable against the pinned source).  This is a **faithful
+port**, not direct execution of the official torch implementation, and is
+reported as a reference with actual unique-query diagnostics; not a
+matched-query comparison.  Run on the same wine/air membership games at
+budgets 64/128/256 (N=1, `paper_shaplEIG_port_{wine,air}.csv`):
 
 | Dataset | Budget (unique) | ShaplEIG RMSE | GAS RMSE (nominal K) |
 |---|---:|---:|---:|
@@ -342,19 +344,19 @@ all.
   run of the project to reach the nominal 1−δ level at feasible budget on
   an M=11 real game.
 
-## Unique-query-capped GAS vs ShaplEIG (audit P1-2, fixed)
+## Unique-query-capped GAS vs ShaplEIG (audit P1-2, fixed — same upper cap, approximately matched actual usage)
 
-`paper_unique_capped_shaplEIG.csv` (N=10 per dataset, caps 512,1024 — both <<2048, cache_enabled=True so gas_unique = cache misses = distinct masks, persistent ShaplEIG oracle for fair timing)
+`paper_unique_capped_shaplEIG.csv` (N=10 per dataset, caps 512,1024 — both <<2048, cache_enabled=True so gas_unique = cache misses = distinct masks via packbits tracking + consistency assert, persistent ShaplEIG oracle, fixed cost measured outside timer)
 
-| Dataset | Cap | GAS RMSE | ShaplEIG RMSE | GAS unique | ShaplEIG unique | cap_honored | unique_matched |
+| Dataset | Cap | GAS RMSE | ShaplEIG RMSE | GAS unique mean±std (min-max) | ShaplEIG unique | cap_honored frac | unique_matched frac |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Wine | 512 | 0.0035 | 0.00035 | 503 | 512 | True | True |
-| Wine | 1024 | 0.0022 | 0.00015 | 1019 | 1024 | True | True |
-| Air | 512 | 0.0038 | 0.0015 | 503 | 512 | True | True |
-| Air | 1024 | 0.0025 | 0.0009 | 1019 | 1024 | True | True |
+| Wine | 512 | 0.00417 | 0.00034 | 433.7±19.8 (405-467) | 512 | 1.0 | 1.0 |
+| Wine | 1024 | 0.00297 | 0.00015 | 665.3±34.4 (614-712) | 1024 | 1.0 | 0.5 |
+| Air | 512 | 0.00394 | 0.00173 | 432.9±23.7 (398-473) | 512 | 1.0 | 1.0 |
+| Air | 1024 | 0.00316 | 0.00096 | 665.3±42.5 (591-739) | 1024 | 1.0 | 0.5 |
 
-- **Protocol fixed after deep audit:** GAS now uses `cache_enabled=True` and counts distinct masks via cache misses + explicit packbits tracking (not evaluation calls), fixed cost 371 measured via `max_budget=0`, ShaplEIG uses persistent `CoalitionOracle` for fair wall-clock.
-- **Honest result:** At matched unique budgets 512/1024, ShaplEIG port achieves lower point RMSE (e.g. wine 512: GAS 0.0035 @503 vs ShaplEIG 0.00035 @512). GAS differentiators remain distribution-free anytime certificates + Neyman residual control, not unconditional RMSE dominance. Wall-clock: ShaplEIG still heavier (GP refit per round) — now fairly measured via persistent oracle.
+- **Protocol fixed after deep audits:** GAS uses persistent coalition cache; cache-miss counter = distinct masks, verified by explicit packbits set `assert cache_misses == len(seen)`. Fixed cost ~310-315 (Stage-1+ pilot) measured via `max_budget=0` outside timer (fair timing). ShaplEIG uses persistent `CoalitionOracle` (no per-query rebuild) for fair wall-clock.
+- **Interpretation (same upper cap, approximately matched):** This is a same maximum unique-query cap comparison with actual usage reported, not exact equal-query. GAS often uses fewer unique masks than cap (e.g. 614 vs 1024 at cap 1024, `unique_matched=False` for 10/40 rows under 35% criterion), which may disadvantage GAS. At approximately matched budgets, faithful ShaplEIG port generally achieves lower point RMSE (wine 512: GAS 0.00417 @433.7 vs ShaplEIG 0.00034 @512). GAS differentiators remain distribution-free anytime certificates (spec range) + Neyman residual control + deterministic coupon-gated finite-pop intervals, not unconditional RMSE dominance.
 
 ## Hard high-dim games beyond parity (audit P1-4)
 
